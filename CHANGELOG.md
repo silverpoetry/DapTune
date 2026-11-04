@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-04
+
+### Fixed
+
+- 修复打开自动页后，设备历史的数据库通知再次触发历史写入，导致持续高 CPU 占用、频繁垃圾回收和后台耗电的问题；
+- 将界面侧设备历史记录统一移至应用级路由事件订阅，调音和自动页的数据刷新不再写回设备历史；相同路由事件去重，重新连接和设备改名仍正常记录；
+- 设备历史保存失败后继续处理后续路由事件，界面销毁时释放订阅，后台自动切换继续由现有前台服务负责。
+- 修复启动或切换设备时 DAP 暂未就绪、首次写入失败后无法自行恢复的问题：在当前服务内有限重试，每次重新解析当前设备和配置；
+- 服务启动后的首次媒体播放会重新应用当前配置，处理厂商音效晚于开机广播初始化的情况。
+
 ## [0.3.3] - 2026-08-20
 
 ### Fixed
@@ -95,7 +105,8 @@
 - Android signer certificate SHA-256:
   `79:62:1F:C9:4C:0C:56:C8:10:8C:BE:C8:32:28:81:7C:D0:6A:E6:1B:05:26:92:53:C3:2D:8D:D2:60:89:4E:F0`.
 
-[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/silverpoetry/DapTune/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/silverpoetry/DapTune/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/silverpoetry/DapTune/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/silverpoetry/DapTune/compare/v0.3.0...v0.3.1

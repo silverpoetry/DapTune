@@ -127,7 +127,6 @@ class AutomationViewModel @Inject constructor(
                         operationLogs = sources.operationLogs,
                     ),
                 )
-                deviceRepository.rememberRoute(sources.route)
             }
         }
     }

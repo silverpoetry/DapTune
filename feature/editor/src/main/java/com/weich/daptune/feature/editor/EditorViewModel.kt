@@ -111,7 +111,6 @@ class EditorViewModel @Inject constructor(
                 )
             }.collect { sources ->
                 updateSources(sources)
-                deviceRepository.rememberRoute(sources.route)
                 sources.resolvedProfile
                     ?.id
                     ?.takeIf { it != sources.storedSelectedProfileId }

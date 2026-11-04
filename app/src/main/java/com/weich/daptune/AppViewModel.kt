@@ -1,12 +1,15 @@
 package com.weich.daptune
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.weich.daptune.core.model.AppRelease
 import com.weich.daptune.domain.CheckForUpdateUseCase
 import com.weich.daptune.domain.AudioRouteMonitor
+import com.weich.daptune.domain.DeviceRepository
 import com.weich.daptune.domain.ProfileRepository
 import com.weich.daptune.domain.SettingsRepository
+import com.weich.daptune.domain.runSuspendCatching
 import com.weich.daptune.feature.automation.AutomationController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -15,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,6 +41,7 @@ class AppViewModel @Inject constructor(
     private val automationController: AutomationController,
     private val checkForUpdate: CheckForUpdateUseCase,
     private val audioRouteMonitor: AudioRouteMonitor,
+    private val deviceRepository: DeviceRepository,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AppUiState())
     val state: StateFlow<AppUiState> = mutableState.asStateFlow()
@@ -44,6 +49,14 @@ class AppViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { profileRepository.ensureBuiltIns() }
+        viewModelScope.launch {
+            // History is an effect of route events, never of database/UI state emissions.
+            // The foreground service owns recording when no Activity exists.
+            audioRouteMonitor.routes.distinctUntilChanged().collect { route ->
+                runSuspendCatching { deviceRepository.rememberRoute(route) }
+                    .onFailure { Log.w("DapTune", "Unable to record output device", it) }
+            }
+        }
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 mutableState.update {

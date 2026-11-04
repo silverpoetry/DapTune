@@ -9,9 +9,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.weich.daptune.core.model.DapApplyResult
@@ -39,6 +43,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
@@ -66,6 +71,20 @@ class EqAutomationService : Service() {
     private var commandGeneration = 0L
     private var lastAppliedRouteKey: String? = null
     private var lastAppliedCurveHash: Int? = null
+    private var awaitingFirstPlayback = true
+    private var playbackCallbackRegistered = false
+    private val playbackCallback = object : AudioManager.AudioPlaybackCallback() {
+        override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {
+            if (!awaitingFirstPlayback || configs.none { config ->
+                    config.audioAttributes.usage in MediaPlaybackUsages
+                }
+            ) return
+            awaitingFirstPlayback = false
+            // Vendor DAP initialization can finish after BOOT_COMPLETED and the first write.
+            // Reapply once when media actually starts; subsequent playback callbacks do no work.
+            reapplyCurrentRoute(force = true, source = ProfileApplySource.AUTOMATION_RECOVERY)
+        }
+    }
     private val dolbyStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             reapplyCurrentRoute(
@@ -84,6 +103,10 @@ class EqAutomationService : Service() {
             IntentFilter(XiaomiDolbyStateAction),
             ContextCompat.RECEIVER_EXPORTED,
         )
+        playbackCallbackRegistered = runCatching {
+            getSystemService(AudioManager::class.java)
+                .registerAudioPlaybackCallback(playbackCallback, mainHandler)
+        }.onFailure { Log.w("DapTune", "Unable to observe initial media playback", it) }.isSuccess
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -173,6 +196,11 @@ class EqAutomationService : Service() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(dolbyStateReceiver) }
+        if (playbackCallbackRegistered) {
+            runCatching {
+                getSystemService(AudioManager::class.java).unregisterAudioPlaybackCallback(playbackCallback)
+            }
+        }
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -205,7 +233,7 @@ class EqAutomationService : Service() {
                         }
                     },
                     processRoute = { route, force, source ->
-                        processRouteSafely(route, force, source)
+                        recoverRouteApplication { processRouteSafely(route, force, source) }
                     },
                     onFailure = { error ->
                         recordMonitorFailure(error)
@@ -218,7 +246,17 @@ class EqAutomationService : Service() {
 
     private fun reapplyCurrentRoute(force: Boolean, source: ProfileApplySource) {
         serviceScope.launch {
-            processCurrentRouteSafely(force = force, source = source)
+            recoverRouteApplication { processCurrentRouteSafely(force = force, source = source) }
+        }
+    }
+
+    /** A bounded startup/device-change operation; the platform subscription stays registered. */
+    private suspend fun recoverRouteApplication(initialAttempt: suspend () -> Boolean) {
+        if (initialAttempt()) return
+        for (delayMillis in RouteRecoveryDelaysMillis) {
+            delay(delayMillis)
+            // Resolve both route and profile again: a delayed attempt must not restore stale input.
+            if (processCurrentRouteSafely(force = false, source = ProfileApplySource.AUTOMATION_RECOVERY)) return
         }
     }
 
@@ -241,11 +279,10 @@ class EqAutomationService : Service() {
         processRoute(route = route, force = force, source = source)
     }
 
-    private suspend fun runRouteOperation(operation: suspend () -> Unit): Boolean = try {
+    private suspend fun runRouteOperation(operation: suspend () -> Boolean): Boolean = try {
         withTimeout(RouteOperationTimeoutMillis) {
             operation()
         }
-        true
     } catch (timeout: TimeoutCancellationException) {
         recordMonitorFailure(timeout)
         notify("播放设备切换超时 · 等待下一次事件")
@@ -262,20 +299,20 @@ class EqAutomationService : Service() {
         route: OutputRoute,
         force: Boolean,
         source: ProfileApplySource,
-    ) = routeProcessingMutex.withLock {
+    ): Boolean = routeProcessingMutex.withLock {
         if (!settingsRepository.settings.first().automationEnabled) {
             mainHandler.post(::shutdown)
-            return@withLock
+            return@withLock true
         }
         if (route.identityKind != OutputRouteIdentityKind.PERSISTENT) {
             notify("需要附近设备权限 · 未切换配置")
-            return@withLock
+            return@withLock true
         }
         deviceRepository.rememberRoute(route)
-        val profile = resolveProfile(route) ?: return@withLock
+        val profile = resolveProfile(route) ?: return@withLock false
         val curveHash = profile.curve.stableHash()
         if (!force && route.key == lastAppliedRouteKey && curveHash == lastAppliedCurveHash) {
-            return@withLock
+            return@withLock true
         }
 
         notify("正在应用 ${profile.name} · ${route.displayName}")
@@ -284,8 +321,14 @@ class EqAutomationService : Service() {
                 lastAppliedRouteKey = route.key
                 lastAppliedCurveHash = curveHash
                 notify("${profile.name} · ${route.displayName}")
+                true
             }
-            is DapApplyResult.Failure -> notify(failureLabel(result, profile, route))
+            is DapApplyResult.Failure -> {
+                lastAppliedRouteKey = null
+                lastAppliedCurveHash = null
+                notify(failureLabel(result, profile, route))
+                false
+            }
         }
     }
 
@@ -392,6 +435,8 @@ class EqAutomationService : Service() {
         private const val MonitorStartupTimeoutMillis = 6_000L
         private const val RouteOperationTimeoutMillis = 10_000L
         private const val FailureLogTimeoutMillis = 1_000L
+        private val RouteRecoveryDelaysMillis = longArrayOf(1_000L, 2_000L, 4_000L, 8_000L)
+        private val MediaPlaybackUsages = setOf(AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME)
     }
 }
 
