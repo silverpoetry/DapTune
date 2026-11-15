@@ -38,6 +38,13 @@ enum class CurveImportFormat {
     FREQUENCY_GAIN_TABLE,
 }
 
+enum class CurveExportFormat(val mimeType: String, val extension: String) {
+    DAPTUNE_JSON("application/json", "daptune.json"),
+    GRAPHIC_EQ("text/plain", "GraphicEQ.txt"),
+}
+
+data class CurveExportDocument(val fileName: String, val mimeType: String, val text: String)
+
 object CurveFileCodec {
     const val MAX_IMPORT_CHARACTERS: Int = 1_000_000
 
@@ -100,6 +107,21 @@ object CurveFileCodec {
                 frequenciesHz = DapBandPlan.frequenciesHz.asList(),
                 gainsQ4 = curve.toQ4List(),
             ),
+        )
+    }
+
+    fun exportDocument(name: String, curve: EqCurve, format: CurveExportFormat): CurveExportDocument {
+        require(isCanonicalProfileName(name)) { "配置名称无效" }
+        val fileName = name.map { character ->
+            if (character.isISOControl() || character in "\\/:*?\"<>|") '_' else character
+        }.joinToString("").trim(' ', '.').ifEmpty { "curve" }
+        return CurveExportDocument(
+            fileName = "$fileName.${format.extension}",
+            mimeType = format.mimeType,
+            text = when (format) {
+                CurveExportFormat.DAPTUNE_JSON -> exportNative(name, curve)
+                CurveExportFormat.GRAPHIC_EQ -> exportGraphicEq(curve)
+            },
         )
     }
 

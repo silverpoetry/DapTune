@@ -55,8 +55,6 @@ data class EditorUiState(
 }
 
 enum class CurveAction {
-    PEAK_TO_ZERO,
-    MEAN_TO_ZERO,
     SMOOTH,
     FLATTEN,
 }
@@ -160,20 +158,23 @@ class EditorViewModel @Inject constructor(
     }
 
     fun transform(action: CurveAction) {
-        mutableState.update { current ->
-            val transformed = when (action) {
-                CurveAction.PEAK_TO_ZERO -> EqTransforms.peakToZero(current.curve)
-                CurveAction.MEAN_TO_ZERO -> EqTransforms.meanToZero(current.curve)
-                CurveAction.SMOOTH -> EqTransforms.smooth(current.curve)
+        updateCurve { curve ->
+            when (action) {
+                CurveAction.SMOOTH -> EqTransforms.smooth(curve)
                 CurveAction.FLATTEN -> EqCurve.flat()
             }
-            current.copy(curve = transformed)
         }
     }
 
-    fun limitMaximum(thresholdDb: Double) {
-        mutableState.update { current ->
-            current.copy(curve = EqTransforms.limitMaximum(current.curve, thresholdDb))
+    fun shift(offsetDb: Double) = updateCurve { EqTransforms.shift(it, offsetDb) }
+
+    fun limitMaximum(thresholdDb: Double) = updateCurve { EqTransforms.limitMaximum(it, thresholdDb) }
+
+    private fun updateCurve(transform: (EqCurve) -> EqCurve) {
+        try {
+            mutableState.update { current -> current.copy(curve = transform(current.curve)) }
+        } catch (error: IllegalArgumentException) {
+            eventChannel.trySend(EditorEvent.Message(error.message ?: "无法处理曲线"))
         }
     }
 

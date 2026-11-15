@@ -1,6 +1,6 @@
 package com.weich.daptune.core.model
 
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Immutable 20-band curve using Dolby's signed Q4 dB representation.
@@ -64,9 +64,11 @@ class EqCurve private constructor(
             require(gainsDb.all(Double::isFinite)) { "Curve contains a non-finite gain" }
             return EqCurve(
                 IntArray(gainsDb.size) { index ->
-                    (gainsDb[index] * Q4_PER_DB)
-                        .roundToInt()
-                        .coerceAtMost(MAX_BOOST_Q4)
+                    val q4 = (gainsDb[index] * Q4_PER_DB).roundToLong()
+                    require(q4 in Int.MIN_VALUE.toLong()..MAX_BOOST_Q4.toLong()) {
+                        "Band $index is outside the Q4 gain range"
+                    }
+                    q4.toInt()
                 },
             )
         }

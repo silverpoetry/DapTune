@@ -9,6 +9,20 @@ import org.junit.Test
 
 class CurveFileCodecTest {
     @Test
+    fun exportedDocumentsPreserveQ4AndUseSafeFileNames() {
+        val curve = EqCurve.ofQ4(List(DapBandPlan.bandCount) { (it - 10) * 17 })
+        val name = "AirPods / 自定义:1"
+        CurveExportFormat.entries.forEach { format ->
+            val document = CurveFileCodec.exportDocument(name, curve, format)
+            assertEquals("AirPods _ 自定义_1.${format.extension}", document.fileName)
+            assertEquals(format.mimeType, document.mimeType)
+            val imported = CurveFileCodec.import(document.text, document.fileName)
+            assertEquals(curve, EqTransforms.quantize(imported.gainsDb, OverflowMode.FIT).curve)
+            if (format == CurveExportFormat.DAPTUNE_JSON) assertEquals(name, imported.suggestedName)
+        }
+    }
+
+    @Test
     fun graphicEq_usesLogFrequencyInterpolation() {
         val imported = CurveFileCodec.import(
             "GraphicEQ: 47 0; 470 10; 4700 0; 19688 -2",

@@ -3,10 +3,10 @@ package com.weich.daptune.core.eq
 import com.weich.daptune.core.model.DapBandPlan
 import com.weich.daptune.core.model.EqCurve
 import kotlin.math.floor
-import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 enum class OverflowMode {
-    /** Scale the entire curve when its positive peak exceeds +10 dB. */
+    /** Translate the entire curve down when its positive peak exceeds +10 dB. */
     FIT,
 
     /** Clamp only values above +10 dB; attenuation remains unchanged. */
@@ -21,36 +21,43 @@ data class CurveConversion(
 )
 
 object EqTransforms {
-    fun eliminatePositiveGain(curve: EqCurve): EqCurve {
-        val gains = curve.toDbList()
-        val shift = -maxOf(0.0, gains.max())
-        return quantize(gains.map { it + shift }, OverflowMode.FIT).curve
+    fun eliminatePositiveGain(curve: EqCurve): EqCurve =
+        shiftQ4(curve, -maxOf(0L, curve.toQ4List().max().toLong()))
+
+    fun peakToZero(curve: EqCurve): EqCurve = shift(curve, peakToZeroOffsetDb(curve))
+
+    fun meanToZero(curve: EqCurve): EqCurve = shift(curve, meanToZeroOffsetDb(curve))
+
+    fun peakToZeroOffsetDb(curve: EqCurve): Double = -curve.toDbList().max()
+
+    /** Round the common offset once, so every pairwise Q4 difference remains exact. */
+    fun meanToZeroOffsetDb(curve: EqCurve): Double =
+        (-curve.toQ4List().average()).roundToLong().toDouble() / EqCurve.Q4_PER_DB
+
+    fun shiftBoundsQ4(curve: EqCurve): LongRange =
+        (Int.MIN_VALUE.toLong() - curve.toQ4List().min())..
+            (EqCurve.MAX_BOOST_Q4.toLong() - curve.toQ4List().max())
+
+    fun quantizedOffsetDb(offsetDb: Double): Double {
+        require(offsetDb.isFinite()) { "请输入有效的平移量" }
+        return (offsetDb * EqCurve.Q4_PER_DB).roundToLong().toDouble() / EqCurve.Q4_PER_DB
     }
 
-    fun peakToZero(curve: EqCurve): EqCurve {
-        val gainsQ4 = curve.toQ4List()
-        val peakQ4 = gainsQ4.max()
-        return EqCurve.ofQ4(
-            gainsQ4.map { gainQ4 ->
-                (gainQ4.toLong() - peakQ4.toLong())
-                    .coerceAtLeast(Int.MIN_VALUE.toLong())
-                    .toInt()
-            },
-        )
+    fun shift(curve: EqCurve, offsetDb: Double): EqCurve {
+        require(offsetDb.isFinite()) { "请输入有效的平移量" }
+        return shiftQ4(curve, (offsetDb * EqCurve.Q4_PER_DB).roundToLong())
     }
 
-    fun meanToZero(curve: EqCurve): EqCurve {
-        val gains = curve.toDbList()
-        val mean = gains.average()
-        return quantize(gains.map { it - mean }, OverflowMode.FIT).curve
+    private fun shiftQ4(curve: EqCurve, offsetQ4: Long): EqCurve {
+        val bounds = shiftBoundsQ4(curve)
+        require(offsetQ4 <= bounds.last) { "平移后峰值超过 +${EqCurve.MAX_BOOST_DB} dB，未修改曲线" }
+        require(offsetQ4 >= bounds.first) { "平移后增益超出可表示范围，未修改曲线" }
+        return EqCurve.ofQ4(curve.toQ4List().map { (it.toLong() + offsetQ4).toInt() })
     }
-
-    fun shift(curve: EqCurve, offsetDb: Double, overflowMode: OverflowMode): EqCurve =
-        quantize(curve.toDbList().map { it + offsetDb }, overflowMode).curve
 
     fun scale(curve: EqCurve, factor: Double): EqCurve {
         require(factor.isFinite() && factor >= 0.0)
-        return quantize(curve.toDbList().map { it * factor }, OverflowMode.FIT).curve
+        return EqCurve.ofDb(curve.toDbList().map { it * factor })
     }
 
     /**
@@ -66,10 +73,8 @@ object EqTransforms {
         }
         // Round toward attenuation so the represented Q4 value never exceeds the requested cap.
         val thresholdQ4 = floor(thresholdDb * EqCurve.Q4_PER_DB)
-            .toLong()
-            .coerceAtLeast(Int.MIN_VALUE.toLong())
-            .toInt()
-        return EqCurve.ofQ4(curve.toQ4List().map { it.coerceAtMost(thresholdQ4) })
+        require(thresholdQ4 >= Int.MIN_VALUE.toDouble()) { "阈值超出可表示范围" }
+        return EqCurve.ofQ4(curve.toQ4List().map { it.coerceAtMost(thresholdQ4.toInt()) })
     }
 
     fun smooth(curve: EqCurve, passes: Int = 1): EqCurve {
@@ -85,7 +90,7 @@ object EqTransforms {
             }
             values = next
         }
-        return quantize(values.asList(), OverflowMode.FIT).curve
+        return EqCurve.ofDb(values.asList())
     }
 
     fun quantize(gainsDb: List<Double>, overflowMode: OverflowMode): CurveConversion {
@@ -103,20 +108,12 @@ object EqTransforms {
         } else {
             when (overflowMode) {
                 OverflowMode.CLAMP -> gainsDb.map { it.coerceAtMost(limit) }
-                OverflowMode.FIT -> {
-                    val factor = limit / maximum
-                    gainsDb.map { it * factor }
-                }
+                OverflowMode.FIT -> gainsDb.map { (it - maximum) + limit }
             }
         }
 
-        val q4 = adjusted.map { gain ->
-            (gain * EqCurve.Q4_PER_DB)
-                .roundToInt()
-                .coerceAtMost(EqCurve.MAX_BOOST_Q4)
-        }
         return CurveConversion(
-            curve = EqCurve.ofQ4(q4),
+            curve = EqCurve.ofDb(adjusted),
             adjusted = exceedsLimit,
             sourceMinimumDb = minimum,
             sourceMaximumDb = maximum,

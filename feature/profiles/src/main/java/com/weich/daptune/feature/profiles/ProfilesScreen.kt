@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.AlertDialog
@@ -64,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.weich.daptune.core.designsystem.AppCard
+import com.weich.daptune.core.designsystem.CurveExportDialog
+import com.weich.daptune.core.designsystem.rememberCurveExporter
 import com.weich.daptune.core.designsystem.CurveSparkline
 import com.weich.daptune.core.designsystem.DapTuneTopAppBar
 import com.weich.daptune.core.designsystem.formatGain
@@ -90,6 +93,8 @@ fun ProfilesScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var deleting by remember { mutableStateOf<EqProfile?>(null) }
+    var exporting by remember { mutableStateOf<EqProfile?>(null) }
+    val export = rememberCurveExporter { message -> scope.launch { snackbar.showSnackbar(message) } }
     var importFormat by remember { mutableStateOf(CurveImportFormat.AUTOMATIC) }
     var showingAutoEq by rememberSaveable { mutableStateOf(false) }
 
@@ -193,6 +198,7 @@ fun ProfilesScreen(
                         selected = profile.id == state.selectedProfileId,
                         onClick = { viewModel.select(profile) },
                         onDuplicate = { viewModel.duplicate(profile) },
+                        onExport = { exporting = profile },
                         onDelete = { deleting = profile },
                     )
                 }
@@ -209,10 +215,21 @@ fun ProfilesScreen(
                     selected = profile.id == state.selectedProfileId,
                     onClick = { viewModel.select(profile) },
                     onDuplicate = { viewModel.duplicate(profile) },
+                    onExport = { exporting = profile },
                     onDelete = null,
                 )
             }
         }
+    }
+
+    exporting?.let { profile ->
+        CurveExportDialog(
+            onDismiss = { exporting = null },
+            onSelect = { format ->
+                export(profile.name, profile.curve, format)
+                exporting = null
+            },
+        )
     }
 
     deleting?.let { profile ->
@@ -350,6 +367,7 @@ private fun ProfileCard(
     selected: Boolean,
     onClick: () -> Unit,
     onDuplicate: () -> Unit,
+    onExport: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -406,6 +424,14 @@ private fun ProfileCard(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false },
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("导出") },
+                            leadingIcon = { Icon(Icons.Outlined.FileUpload, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onExport()
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("复制") },
                             leadingIcon = {

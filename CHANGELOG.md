@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-15
+
+### Added
+
+- 调音页支持将当前曲线（含尚未保存的修改）导出为 DapTune JSON 或 GraphicEQ 文本；配置卡片也可直接导出，文件由系统文件选择器保存；
+- 新增统一的“平移”菜单，支持自定偏移量、峰值归零、均值归零和结果预览。
+
+### Fixed
+
+- 所有平移统一对 20 段加上同一个 Q4 偏移量，保留频段间增益差，不再隐式缩放或逐段截平；超出增益范围时提示并保留原曲线；
+- 非原生文件及 AutoEq 导入超过 +10 dB 的曲线时，改为整体下移到上限，保留原始增益差；
+- 拒绝超出整数表示范围的变换结果，避免极端衰减值被静默饱和；阈值截平仍是独立的显式操作。
+
 ## [0.3.4] - 2026-11-04
 
 ### Fixed
@@ -105,7 +118,8 @@
 - Android signer certificate SHA-256:
   `79:62:1F:C9:4C:0C:56:C8:10:8C:BE:C8:32:28:81:7C:D0:6A:E6:1B:05:26:92:53:C3:2D:8D:D2:60:89:4E:F0`.
 
-[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/silverpoetry/DapTune/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/silverpoetry/DapTune/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/silverpoetry/DapTune/compare/v0.3.1...v0.3.2

@@ -42,7 +42,7 @@ audio, volume leveling, and every other Dolby parameter untouched.
   first;
 - includes Flat, Warm, Powerful, Loudness, Vocal, Bright, and Soft starting points.
 
-### Import and curve processing
+### Import, export, and curve processing
 
 - Imports lossless DapTune JSON, Wavelet/AutoEq `GraphicEQ`, the supported
   Equalizer APO/AutoEq parametric subset, and CSV, TSV, or text frequency-gain tables;
@@ -50,8 +50,12 @@ audio, volume leveling, and every other Dolby parameter untouched.
   standard `GraphicEQ` into a saved 20-band custom profile;
 - supports automatic detection and an explicit source selector; an explicit choice never silently
   falls through to another parser;
-- provides peak and mean normalization, smoothing, uniform shift, scaling, and a configurable hard
-  upper threshold;
+- exports lossless DapTune JSON or GraphicEQ text from the editor (including unsaved changes) or
+  profile cards through the system file picker;
+- groups custom offsets, peak-to-zero, and mean-to-zero under Shift; all bands receive the same Q4
+  offset, and out-of-range requests are rejected without reshaping the curve;
+- provides smoothing, flattening, and explicit hard threshold limiting separately; imported curves
+  above +10 dB are shifted down uniformly instead of scaled;
 - converts non-native curves through deterministic log-frequency interpolation or a 48 kHz biquad
   magnitude response before the final 20-band Q4 quantization.
 

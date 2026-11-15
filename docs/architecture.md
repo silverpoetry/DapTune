@@ -19,6 +19,7 @@ app
 
 - `core:model`：不可变曲线、配置、路由、DAP 结果和日志模型；
 - `core:eq`：严格文件解析、对数频率插值、biquad 采样、Q4 量化和曲线变换；
+- `core:designsystem`：共享 Material 3 组件、曲线绘制，以及系统文件导出的 UI 适配；格式编码仍由 `core:eq` 负责；
 - `domain`：仓储及平台接口、应用和选择配置的用例、日志语义；
 - `data`：Room 配置、设备规则、应用状态和日志，DataStore 负责轻量设置；
 - `platform:dap`：descriptor 分类、私有 `AudioEffect` 桥、参数打包、写入事务和回滚；
@@ -45,6 +46,9 @@ app
 
 领域里的 `EqCurve` 正好包含 20 个 Q4 整数，并只施加 `+160 Q4` 正增益上限。负值不设产品下限。
 显示、持久化和 DAP 写入共享这一对象，避免 UI 曲线与实际 payload 使用不同舍入结果。
+
+平移仅量化一次公共偏移量，以 Long 中间值计算可行范围，再整体加回 Q4。不能表示的结果直接拒绝，
+不逐段裁切或缩放。非原生文件超限适配使用整体下移；显式阈值截平与平移分离。
 
 原生 JSON 直接保存 Q4；其他格式先转换为 dB 响应，再统一量化。详细契约见
 [DapTune JSON v1](daptune-json-format.md)和[导入格式](import-formats.md)。

@@ -6,6 +6,16 @@ import org.junit.Test
 
 class EqCurveTest {
     @Test
+    fun decimalConstructionRejectsOverflowInsteadOfSilentlyClipping() {
+        assertThrows(IllegalArgumentException::class.java) {
+            EqCurve.ofDb(List(DapBandPlan.bandCount) { 11.0 })
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            EqCurve.ofDb(List(DapBandPlan.bandCount) { -1e12 })
+        }
+    }
+
+    @Test
     fun deepAttenuationIsAcceptedWithoutClamping() {
         val gains = IntArray(DapBandPlan.bandCount) { -640 }
 

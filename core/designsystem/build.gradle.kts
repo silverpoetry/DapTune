@@ -16,6 +16,8 @@ android {
 
 dependencies {
     api(project(":core:model"))
+    implementation(project(":core:eq"))
+    implementation(libs.androidx.activity.compose)
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.foundation)

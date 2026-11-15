@@ -132,7 +132,10 @@ class ProfilesViewModel @Inject constructor(
                 Triple(saved, imported.exceedsLimit, imported.warnings)
             }.onSuccess { (saved, adjusted, warnings) ->
                 selectProfileForRoute(saved.id, route)
-                val adjustment = if (adjusted) "；已按比例压缩到 +10 dB 上限" else ""
+                val adjustment = if (!adjusted) "" else when (overflowMode) {
+                    OverflowMode.FIT -> "；已整体下移至 +10 dB 上限"
+                    OverflowMode.CLAMP -> "；已截平超过 +10 dB 的频段"
+                }
                 val detail = warnings.joinToString(separator = "；", prefix = if (warnings.isEmpty()) "" else "；")
                 messageChannel.send("已导入“${saved.name}”$adjustment$detail")
             }.onFailure { error ->
@@ -182,7 +185,7 @@ class ProfilesViewModel @Inject constructor(
                     it.copy(lastImportedPath = profile.relativePath)
                 }
                 val adjustment = if (imported.adjustedToBoostLimit) {
-                    "；已按比例压缩到 +10 dB 上限"
+                    "；已整体下移至 +10 dB 上限"
                 } else {
                     ""
                 }

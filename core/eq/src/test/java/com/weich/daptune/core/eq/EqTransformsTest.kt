@@ -5,6 +5,7 @@ import com.weich.daptune.core.model.EqCurve
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,23 +33,72 @@ class EqTransformsTest {
     }
 
     @Test
-    fun meanToZero_hasAtMostOneQ4RoundingError() {
+    fun meanToZero_usesOneCommonOffsetAndHasAtMostHalfAQ4RoundingError() {
         val source = EqCurve.ofQ4(List(DapBandPlan.bandCount) { index -> (index - 7) * 5 })
 
         val result = EqTransforms.meanToZero(source)
 
-        assertTrue(kotlin.math.abs(result.toQ4List().sum()) <= DapBandPlan.bandCount)
+        assertTrue(kotlin.math.abs(result.toQ4List().sum()) <= DapBandPlan.bandCount / 2)
+        assertEquals(1, (0 until DapBandPlan.bandCount).map { result[it] - source[it] }.distinct().size)
     }
 
     @Test
-    fun fit_scalesOnlyWhenPositiveBoostExceedsLimit() {
+    fun fit_translatesAllBandsWhenPositiveBoostExceedsLimit() {
         val source = List(DapBandPlan.bandCount) { index -> -20.0 + index * 2.0 }
 
         val conversion = EqTransforms.quantize(source, OverflowMode.FIT)
 
         assertTrue(conversion.adjusted)
-        assertEquals(-178, conversion.curve.toQ4List().min())
+        assertEquals(-448, conversion.curve.toQ4List().min())
         assertEquals(EqCurve.MAX_BOOST_Q4, conversion.curve.toQ4List().max())
+        source.indices.forEach { index ->
+            assertEquals(-8.0, conversion.curve.gainDb(index) - source[index], 0.0)
+        }
+    }
+
+    @Test
+    fun upwardShiftRejectsOverflowInsteadOfScalingOrClipping() {
+        val source = EqCurve.ofDb(List(DapBandPlan.bandCount) { if (it == 0) 9.0 else -20.0 })
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.shift(source, 2.0) }
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.meanToZero(source) }
+        assertEquals(9.0, source.gainDb(0), 0.0)
+        assertEquals(-20.0, source.gainDb(1), 0.0)
+    }
+
+    @Test
+    fun fractionalShiftPreservesEveryBandDifferenceAndIsReversible() {
+        val source = EqCurve.ofQ4(List(DapBandPlan.bandCount) { (it - 10) * 17 })
+        val shifted = EqTransforms.shift(source, -0.1)
+        source.toQ4List().indices.forEach { assertEquals(-2, shifted[it] - source[it]) }
+        assertEquals(source, EqTransforms.shift(shifted, 0.125))
+    }
+
+    @Test
+    fun peakToZeroCanRaiseAnEntireNegativeCurve() {
+        val source = EqCurve.ofDb(List(DapBandPlan.bandCount) { if (it == 0) -5.0 else -40.0 })
+        val shifted = EqTransforms.peakToZero(source)
+        assertEquals(0.0, shifted.gainDb(0), 0.0)
+        assertEquals(-35.0, shifted.gainDb(1), 0.0)
+    }
+
+    @Test
+    fun technicalIntegerBoundaryRejectsLossInsteadOfSaturatingIndividualBands() {
+        val source = EqCurve.ofQ4(List(DapBandPlan.bandCount) { if (it == 0) 160 else Int.MIN_VALUE })
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.peakToZero(source) }
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.shift(source, -0.0625) }
+        val negative = EqCurve.ofQ4(List(DapBandPlan.bandCount) { Int.MIN_VALUE })
+        assertEquals(EqCurve.flat(), EqTransforms.peakToZero(negative))
+    }
+
+    @Test
+    fun scaleAndQuantizeRejectUnrepresentableResults() {
+        val source = EqCurve.ofDb(List(DapBandPlan.bandCount) { 6.0 })
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.scale(source, 2.0) }
+        assertThrows(IllegalArgumentException::class.java) {
+            EqTransforms.quantize(List(DapBandPlan.bandCount) { -1e12 }, OverflowMode.FIT)
+        }
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.shift(source, Double.NaN) }
+        assertThrows(IllegalArgumentException::class.java) { EqTransforms.shift(source, Double.MAX_VALUE) }
     }
 
     @Test
