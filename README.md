@@ -164,7 +164,7 @@ Android 13+ 拒绝通知权限时，AOSP 仍允许前台服务运行，但通知
 
 | 来源 | 支持范围 | 转换 |
 |---|---|---|
-| DapTune JSON v1 / v2 | 固定 20 段 signed Q4 | 解析无损，不重采样；转换遵循增益设置 |
+| DapTune JSON v1 | 固定 20 段 signed Q4 | 解析无损，不重采样；转换遵循增益设置 |
 | GraphicEQ | Wavelet、AutoEq 常见 `GraphicEQ:` 与全局 `Preamp:` | 对数频率轴线性插值 |
 | ParametricEQ | `PK/PEQ`、`LS/LSC`、`HS/HSC`，可含全局 `Preamp:` | 按 48 kHz 求 biquad 幅频响应 |
 | CSV / TSV / 文本表 | 两列频率与增益，或受支持的表头 | 对数频率轴线性插值 |
@@ -195,13 +195,12 @@ Android 13+ 拒绝通知权限时，AOSP 仍允许前台服务运行，但通知
 }
 ~~~
 
-`gains_q4` 使用 `dB = Q4 / 16`。v1 的最大值保持 `160`（`+10 dB`）；v2 支持完整 signed Int 范围。
-高于 +10 dB 时自动导出 v2，普通曲线继续导出 v1。文件表示范围与应用侧增益设置、厂商实际支持范围相互独立。
+`gains_q4` 使用 `dB = Q4 / 16`，支持完整 signed Int 范围；所有曲线统一使用 `version: 1`。
+文件格式不包含 +10 dB 限制；应用增益上限由设置控制，厂商实际支持范围由设备决定。
 没有独立 `preamp` 字段，整体预衰减应直接减去全部 20 个 Q4 值。
 
-- [完整 DapTune JSON v1 / v2 规范](docs/daptune-json-format.md)
+- [完整 DapTune JSON v1 规范](docs/daptune-json-format.md)
 - [JSON Schema Draft 2020-12](docs/schema/daptune-profile-v1.schema.json)
-- [v2 Schema](docs/schema/daptune-profile-v2.schema.json)
 - [平直示例](examples/profiles/flat.daptune.json)
 - [暖厚示例](examples/profiles/warm.daptune.json)
 - [深衰减示例](examples/profiles/deep-attenuation.daptune.json)

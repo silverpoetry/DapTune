@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-15
+
+### Fixed
+
+- DapTune JSON 统一只读写版本 1，直接接受完整 signed Int Q4 范围，取消按增益大小切换文件版本；
+- 移除 v2 解析、导出分支及 Schema，不保留兼容路径；增益上限继续仅由应用设置控制；
+- 同步文件格式文档、示例和契约校验脚本。
+
 ## [0.5.0] - 2026-11-15
 
 ### Added
@@ -132,7 +140,8 @@
 - Android signer certificate SHA-256:
   `79:62:1F:C9:4C:0C:56:C8:10:8C:BE:C8:32:28:81:7C:D0:6A:E6:1B:05:26:92:53:C3:2D:8D:D2:60:89:4E:F0`.
 
-[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/silverpoetry/DapTune/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/silverpoetry/DapTune/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/silverpoetry/DapTune/compare/v0.3.3...v0.3.4

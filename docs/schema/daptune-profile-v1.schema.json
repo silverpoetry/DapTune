@@ -65,7 +65,7 @@
       "items": {
         "type": "integer",
         "minimum": -2147483648,
-        "maximum": 160
+        "maximum": 2147483647
       },
       "description": "Signed Q4 dB gains in frequency order; dB = Q4 / 16."
     }

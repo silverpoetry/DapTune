@@ -1,6 +1,6 @@
 {
   "format": "com.weich.daptune.profile",
-  "version": 2,
+  "version": 1,
   "name": "Extended gain example",
   "band_plan": "dolby-dap-20-v1",
   "frequencies_hz": [47, 141, 234, 328, 469, 656, 844, 1031, 1313, 1688, 2250, 3000, 3750, 4688, 5813, 7125, 9000, 11250, 13875, 19688],

@@ -50,9 +50,7 @@ object CurveFileCodec {
     const val MAX_IMPORT_CHARACTERS: Int = 1_000_000
 
     private const val FileFormat = "com.weich.daptune.profile"
-    private const val LegacyFileVersion = 1
-    private const val ExtendedFileVersion = 2
-    private const val LegacyMaximumGainQ4 = 160
+    private const val FileVersion = 1
     private const val DefaultSampleRate = 48_000.0
 
     private val json = Json {
@@ -104,7 +102,7 @@ object CurveFileCodec {
         return json.encodeToString(
             ProfileFileDto(
                 format = FileFormat,
-                version = if (curve.toQ4List().any { it > LegacyMaximumGainQ4 }) ExtendedFileVersion else LegacyFileVersion,
+                version = FileVersion,
                 name = name,
                 bandPlan = DapBandPlan.id,
                 frequenciesHz = DapBandPlan.frequenciesHz.asList(),
@@ -141,7 +139,7 @@ object CurveFileCodec {
 
     private fun importNative(text: String, fileName: String): ImportedCurve {
         val dto = json.decodeFromString<ProfileFileDto>(text)
-        if (dto.format != FileFormat || dto.version !in LegacyFileVersion..ExtendedFileVersion) {
+        if (dto.format != FileFormat || dto.version != FileVersion) {
             throw CurveImportException("不支持的 DapTune 文件版本")
         }
         if (dto.bandPlan != DapBandPlan.id || dto.frequenciesHz != DapBandPlan.frequenciesHz.asList()) {
@@ -150,9 +148,6 @@ object CurveFileCodec {
         val profileName = dto.name.trim()
         if (!isCanonicalProfileName(dto.name)) {
             throw CurveImportException("配置名称必须为 1–$MaxProfileNameLength 个字符")
-        }
-        if (dto.version == LegacyFileVersion && dto.gainsQ4.any { it > LegacyMaximumGainQ4 }) {
-            throw CurveImportException("v1 文件的增益不能超过 +10 dB；更高增益请使用 v2 格式")
         }
         val curve = try {
             EqCurve.ofQ4(dto.gainsQ4)

@@ -205,7 +205,7 @@ notification and confirm that the service remains visible under the system's act
 
 | Source | Supported input | Conversion |
 |---|---|---|
-| DapTune JSON v1 / v2 | Fixed 20-band signed Q4 | Lossless parsing, no resampling; conversion follows gain settings |
+| DapTune JSON v1 | Fixed 20-band signed Q4 | Lossless parsing, no resampling; conversion follows gain settings |
 | GraphicEQ | Common Wavelet/AutoEq `GraphicEQ:` plus global `Preamp:` | Linear interpolation on a log-frequency axis |
 | ParametricEQ | `PK/PEQ`, `LS/LSC`, and `HS/HSC` plus global `Preamp:` | 48 kHz biquad magnitude response |
 | CSV / TSV / text table | Two frequency-gain columns or recognized headers | Linear interpolation on a log-frequency axis |
@@ -238,14 +238,13 @@ rejected:
 }
 ~~~
 
-`gains_q4` uses `dB = Q4 / 16`. Version 1 retains its `160` (`+10 dB`) ceiling; version 2 supports
-the full signed Int range. Curves above +10 dB export as v2; other curves export as v1. There is no
+`gains_q4` uses `dB = Q4 / 16` and supports the full signed Int range. All curves use `version: 1`;
+the file format imposes no +10 dB ceiling. Application limits are controlled in Settings. There is no
 application-level attenuation floor. There is no separate `preamp` field; a global attenuation is
 represented by subtracting the same Q4 value from all 20 bands.
 
-- [Normative DapTune JSON v1 / v2 specification](docs/daptune-json-format.md)
+- [Normative DapTune JSON v1 specification](docs/daptune-json-format.md)
 - [JSON Schema Draft 2020-12](docs/schema/daptune-profile-v1.schema.json)
-- [v2 Schema](docs/schema/daptune-profile-v2.schema.json)
 - [Flat example](examples/profiles/flat.daptune.json)
 - [Warm example](examples/profiles/warm.daptune.json)
 - [Deep-attenuation example](examples/profiles/deep-attenuation.daptune.json)

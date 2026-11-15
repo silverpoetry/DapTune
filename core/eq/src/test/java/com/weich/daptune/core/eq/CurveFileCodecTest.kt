@@ -10,14 +10,14 @@ import org.junit.Test
 
 class CurveFileCodecTest {
     @Test
-    fun extendedGainExportsV2AndRoundTripsWithoutAnEnabledCeiling() {
+    fun extendedGainUsesV1AndRoundTripsWithoutAnEnabledCeiling() {
         val curve = EqCurve.ofQ4(List(DapBandPlan.bandCount) { if (it == 0) 320 else -400 })
         val text = CurveFileCodec.exportNative("Extended", curve)
-        assertTrue(text.contains("\"version\": 2"))
+        assertTrue(text.contains("\"version\": 1"))
         val imported = CurveFileCodec.import(text, "extended.daptune.json")
         assertEquals(curve, EqTransforms.quantize(imported.gainsDb, OverflowMode.FIT, GainLimit(enabled = false)).curve)
         org.junit.Assert.assertThrows(CurveImportException::class.java) {
-            CurveFileCodec.import(text.replace("\"version\": 2", "\"version\": 1"), "invalid-v1.json")
+            CurveFileCodec.import(text.replace("\"version\": 1", "\"version\": 2"), "unsupported.json")
         }
     }
 
