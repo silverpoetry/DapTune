@@ -160,7 +160,7 @@ mismatches, and uninstallation, and the
 5. distinguish “curve verified by readback” from “write command accepted,” then restore the target
    curve;
 6. import or save named curves from Profiles;
-7. assign the default and per-device rules in Automation, then enable automatic switching;
+7. assign the default and per-device rules in Settings, then enable switching by playback device;
 8. enable restore-after-reboot only if desired, and allow autostart, background operation, or an
    unrestricted battery policy where the firmware requires it;
 9. switch outputs and inspect the log for the detected route, selected profile, and write result.

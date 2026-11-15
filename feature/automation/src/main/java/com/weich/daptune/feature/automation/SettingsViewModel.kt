@@ -7,6 +7,7 @@ import com.weich.daptune.core.model.AppSettings
 import com.weich.daptune.core.model.DapApplyResult
 import com.weich.daptune.core.model.DeviceBinding
 import com.weich.daptune.core.model.EqProfile
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.KnownOutputDevice
 import com.weich.daptune.core.model.OutputRoute
 import com.weich.daptune.core.model.OperationLogAction
@@ -28,9 +29,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class AutomationUiState(
+data class SettingsUiState(
     val settings: AppSettings = AppSettings(),
     val profiles: List<EqProfile> = emptyList(),
     val devices: List<KnownOutputDevice> = emptyList(),
@@ -38,6 +40,7 @@ data class AutomationUiState(
     val currentRoute: OutputRoute = OutputRoute.Speaker,
     val appliedSnapshot: AppliedSnapshot? = null,
     val operationLogs: List<OperationLogEntry> = emptyList(),
+    val gainLimitSaving: Boolean = false,
 ) {
     fun profileFor(routeKey: String): EqProfile? {
         val profileId = bindings.firstOrNull { it.routeKey == routeKey }?.profileId
@@ -48,7 +51,7 @@ data class AutomationUiState(
         get() = profiles.firstOrNull { it.id == settings.defaultProfileId }
 }
 
-private data class AutomationSources(
+private data class SettingsSources(
     val profiles: List<EqProfile>,
     val devices: List<KnownOutputDevice>,
     val bindings: List<DeviceBinding>,
@@ -72,7 +75,7 @@ private data class RuntimeSources(
 )
 
 @HiltViewModel
-class AutomationViewModel @Inject constructor(
+class SettingsViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val deviceRepository: DeviceRepository,
     private val settingsRepository: SettingsRepository,
@@ -82,8 +85,8 @@ class AutomationViewModel @Inject constructor(
     private val controller: AutomationController,
     private val operationLogRepository: OperationLogRepository,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(AutomationUiState())
-    val state: StateFlow<AutomationUiState> = mutableState
+    private val mutableState = MutableStateFlow(SettingsUiState())
+    val state: StateFlow<SettingsUiState> = mutableState
     private val messageChannel = Channel<String>(Channel.BUFFERED)
     val messages = messageChannel.receiveAsFlow()
 
@@ -106,7 +109,7 @@ class AutomationViewModel @Inject constructor(
                 RuntimeSources(settings, route, snapshot)
             }
             combine(profileDeviceSources, runtimeSources) { profileSources, runtime ->
-                AutomationSources(
+                SettingsSources(
                     profiles = profileSources.profiles,
                     devices = profileSources.devices,
                     bindings = profileSources.bindings,
@@ -116,8 +119,8 @@ class AutomationViewModel @Inject constructor(
                     operationLogs = profileSources.operationLogs,
                 )
             }.collect { sources ->
-                mutableState.emit(
-                    AutomationUiState(
+                mutableState.update { current ->
+                    current.copy(
                         settings = sources.settings,
                         profiles = sources.profiles,
                         devices = sources.devices,
@@ -125,8 +128,22 @@ class AutomationViewModel @Inject constructor(
                         currentRoute = sources.route,
                         appliedSnapshot = sources.snapshot,
                         operationLogs = sources.operationLogs,
-                    ),
-                )
+                    )
+                }
+            }
+        }
+    }
+
+    fun setGainLimit(limit: GainLimit) {
+        if (mutableState.value.gainLimitSaving) return
+        mutableState.update { it.copy(gainLimitSaving = true) }
+        viewModelScope.launch {
+            try {
+                runSuspendCatching { settingsRepository.setGainLimit(limit) }
+                    .onSuccess { mutableState.update { it.copy(settings = it.settings.copy(gainLimit = limit)) } }
+                    .onFailure { messageChannel.send(it.message ?: "设置保存失败") }
+            } finally {
+                mutableState.update { it.copy(gainLimitSaving = false) }
             }
         }
     }

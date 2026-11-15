@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-15
+
+### Changed
+
+- 将底部“自动”页整合为“设置”页，统一管理增益上限、自动切换、开机恢复、设备规则、操作记录和应用信息；
+- 删除独立的增益设置页面及跳转入口，曲线处理菜单仅保留曲线操作；
+- 设置状态与保存逻辑统一由设置页 ViewModel 管理，清除应用层重复状态与导航回调。
+
 ## [0.5.1] - 2026-11-15
 
 ### Fixed
@@ -140,7 +148,8 @@
 - Android signer certificate SHA-256:
   `79:62:1F:C9:4C:0C:56:C8:10:8C:BE:C8:32:28:81:7C:D0:6A:E6:1B:05:26:92:53:C3:2D:8D:D2:60:89:4E:F0`.
 
-[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/silverpoetry/DapTune/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/silverpoetry/DapTune/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/silverpoetry/DapTune/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...v0.4.0

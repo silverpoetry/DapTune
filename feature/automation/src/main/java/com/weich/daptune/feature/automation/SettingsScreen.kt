@@ -40,7 +40,6 @@ import androidx.compose.material.icons.outlined.SettingsInputHdmi
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -101,11 +100,10 @@ private sealed interface ProfilePickerTarget {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AutomationScreen(
+fun SettingsScreen(
     modifier: Modifier = Modifier,
-    viewModel: AutomationViewModel = hiltViewModel(),
+    viewModel: SettingsViewModel = hiltViewModel(),
     onOpenAbout: () -> Unit = {},
-    onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -163,13 +161,8 @@ fun AutomationScreen(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             DapTuneTopAppBar(
-                title = "自动切换",
+                title = "设置",
                 scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "设置")
-                    }
-                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -182,7 +175,16 @@ fun AutomationScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { SectionHeading("常规") }
+            item { SectionHeading("均衡器") }
+            item {
+                GainLimitSettingsCard(
+                    limit = state.settings.gainLimit,
+                    saving = state.gainLimitSaving,
+                    onChange = viewModel::setGainLimit,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+            item { SectionHeading("自动切换", modifier = Modifier.padding(top = 4.dp)) }
             item {
                 AppCard(
                     modifier = Modifier
@@ -191,7 +193,7 @@ fun AutomationScreen(
                 ) {
                     Column {
                         ListItem(
-                            headlineContent = { Text("自动切换") },
+                            headlineContent = { Text("按播放设备切换") },
                             supportingContent = { Text("播放设备变化时应用对应配置") },
                             leadingContent = {
                                 Icon(Icons.Outlined.Tune, contentDescription = null)

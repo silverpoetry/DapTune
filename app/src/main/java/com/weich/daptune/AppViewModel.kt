@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.weich.daptune.core.model.AppRelease
-import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.domain.CheckForUpdateUseCase
 import com.weich.daptune.domain.AudioRouteMonitor
 import com.weich.daptune.domain.DeviceRepository
@@ -25,9 +24,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AppUiState(
-    val gainLimit: GainLimit = GainLimit(),
-    val gainLimitSaving: Boolean = false,
-    val gainLimitError: String? = null,
     val automaticUpdateChecksEnabled: Boolean = true,
     val lastUpdateCheckAtEpochMillis: Long = 0L,
     val updateCheckInProgress: Boolean = false,
@@ -65,7 +61,6 @@ class AppViewModel @Inject constructor(
             settingsRepository.settings.collect { settings ->
                 mutableState.update {
                     it.copy(
-                        gainLimit = settings.gainLimit,
                         automaticUpdateChecksEnabled =
                             settings.automaticUpdateChecksEnabled,
                         lastUpdateCheckAtEpochMillis =
@@ -75,19 +70,6 @@ class AppViewModel @Inject constructor(
             }
         }
     }
-
-    fun setGainLimit(limit: GainLimit) {
-        if (mutableState.value.gainLimitSaving) return
-        mutableState.update { it.copy(gainLimitSaving = true, gainLimitError = null) }
-        viewModelScope.launch {
-            runSuspendCatching { settingsRepository.setGainLimit(limit) }
-                .onSuccess { mutableState.update { it.copy(gainLimit = limit) } }
-                .onFailure { error -> mutableState.update { it.copy(gainLimitError = error.message ?: "设置保存失败") } }
-            mutableState.update { it.copy(gainLimitSaving = false) }
-        }
-    }
-
-    fun dismissGainLimitError() { mutableState.update { it.copy(gainLimitError = null) } }
 
     fun restoreAutomation() {
         viewModelScope.launch {

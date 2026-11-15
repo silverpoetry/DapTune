@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
+import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -27,11 +27,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesomeMotion
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.BluetoothAudio
 import androidx.compose.material.icons.outlined.Equalizer
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.rounded.AutoAwesomeMotion
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
@@ -66,7 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.weich.daptune.core.designsystem.DapTuneTheme
 import com.weich.daptune.feature.about.AboutScreen
 import com.weich.daptune.feature.about.AboutUiState
-import com.weich.daptune.feature.automation.AutomationScreen
+import com.weich.daptune.feature.automation.SettingsScreen
 import com.weich.daptune.feature.editor.EditorScreen
 import com.weich.daptune.feature.profiles.ProfilesScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -99,10 +99,10 @@ private enum class AppDestination(
 ) {
     Editor("调音", Icons.Outlined.Equalizer, Icons.Rounded.Equalizer),
     Profiles("配置", Icons.Outlined.Tune, Icons.Rounded.Tune),
-    Automation(
-        "自动",
-        Icons.Outlined.AutoAwesomeMotion,
-        Icons.Rounded.AutoAwesomeMotion,
+    Settings(
+        "设置",
+        Icons.Outlined.Settings,
+        Icons.Rounded.Settings,
     ),
 }
 
@@ -111,21 +111,13 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
     val state by appViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showAbout by rememberSaveable { mutableStateOf(false) }
-    var showSettings by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(pageCount = { AppDestination.entries.size })
 
     LaunchedEffect(Unit) {
         appViewModel.checkForUpdatesAutomatically(BuildConfig.VERSION_NAME)
     }
 
-    if (showSettings) {
-        SettingsScreen(
-            state = state,
-            onChange = appViewModel::setGainLimit,
-            onErrorShown = appViewModel::dismissGainLimitError,
-            onBack = { showSettings = false },
-        )
-    } else if (showAbout) {
+    if (showAbout) {
         AboutScreen(
             versionName = BuildConfig.VERSION_NAME,
             state = AboutUiState(
@@ -150,7 +142,7 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
             onOpenPrivacyPolicy = { openUrl(context, PrivacyUrl) },
         )
     } else {
-        MainPager(pagerState, onOpenAbout = { showAbout = true }, onOpenSettings = { showSettings = true })
+        MainPager(pagerState, onOpenAbout = { showAbout = true })
     }
 
     state.pendingUpdateAnnouncement?.let { release ->
@@ -176,7 +168,7 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
 }
 
 @Composable
-private fun MainPager(pagerState: PagerState, onOpenAbout: () -> Unit, onOpenSettings: () -> Unit) {
+private fun MainPager(pagerState: PagerState, onOpenAbout: () -> Unit) {
     val destinations = AppDestination.entries
     val scope = rememberCoroutineScope()
 
@@ -214,9 +206,9 @@ private fun MainPager(pagerState: PagerState, onOpenAbout: () -> Unit, onOpenSet
             key = { destinations[it].name },
         ) {
             when (destinations[it]) {
-                AppDestination.Editor -> EditorScreen(onOpenSettings = onOpenSettings)
+                AppDestination.Editor -> EditorScreen()
                 AppDestination.Profiles -> ProfilesScreen(isActive = pagerState.currentPage == it)
-                AppDestination.Automation -> AutomationScreen(onOpenAbout = onOpenAbout, onOpenSettings = onOpenSettings)
+                AppDestination.Settings -> SettingsScreen(onOpenAbout = onOpenAbout)
             }
         }
     }
@@ -263,7 +255,7 @@ private fun BluetoothPermissionGate(
             onOpenSettings = {
                 context.startActivity(
                     Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         Uri.fromParts("package", context.packageName, null),
                     ),
                 )

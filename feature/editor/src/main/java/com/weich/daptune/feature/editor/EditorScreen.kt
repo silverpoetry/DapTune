@@ -89,7 +89,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun EditorScreen(
     modifier: Modifier = Modifier,
-    onOpenSettings: () -> Unit,
     viewModel: EditorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -214,10 +213,6 @@ fun EditorScreen(
             CurveToolItem("全部归零", "恢复平直曲线") {
                 viewModel.transform(CurveAction.FLATTEN)
                 showTools = false
-            }
-            CurveToolItem("增益上限", if (state.gainLimit.enabled) "${formatShiftDb(state.gainLimit.maximumDb)} dB" else "已关闭") {
-                showTools = false
-                onOpenSettings()
             }
             Spacer(Modifier.height(28.dp))
         }

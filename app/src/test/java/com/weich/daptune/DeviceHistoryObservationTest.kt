@@ -30,7 +30,7 @@ import com.weich.daptune.domain.SaveProfileUseCase
 import com.weich.daptune.domain.SelectProfileForRouteUseCase
 import com.weich.daptune.domain.SettingsRepository
 import com.weich.daptune.feature.automation.AutomationController
-import com.weich.daptune.feature.automation.AutomationViewModel
+import com.weich.daptune.feature.automation.SettingsViewModel
 import com.weich.daptune.feature.editor.EditorViewModel
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -177,7 +177,7 @@ class DeviceHistoryObservationTest {
         val logs = MutableStateFlow<List<OperationLogEntry>>(emptyList())
         val recorded = mutableListOf<OutputRoute>()
         var nextFailure: Exception? = null
-        lateinit var automation: AutomationViewModel
+        lateinit var automation: SettingsViewModel
         lateinit var editor: EditorViewModel
 
         suspend fun start(pages: Boolean) {
@@ -225,7 +225,7 @@ class DeviceHistoryObservationTest {
             if (!pages) return
             val resolve = ResolveProfileForRouteUseCase(profileRepository, devices, settingsRepository)
             val apply = ApplyProfileUseCase(profileRepository, devices, gateway, operationLogs, settingsRepository)
-            automation = AutomationViewModel(
+            automation = SettingsViewModel(
                 profileRepository, devices, settingsRepository, monitor, resolve, apply, controller, operationLogs,
             )
             editor = EditorViewModel(
