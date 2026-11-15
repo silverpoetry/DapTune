@@ -224,13 +224,13 @@ class DeviceHistoryObservationTest {
             )
             if (!pages) return
             val resolve = ResolveProfileForRouteUseCase(profileRepository, devices, settingsRepository)
-            val apply = ApplyProfileUseCase(profileRepository, devices, gateway, operationLogs)
+            val apply = ApplyProfileUseCase(profileRepository, devices, gateway, operationLogs, settingsRepository)
             automation = AutomationViewModel(
                 profileRepository, devices, settingsRepository, monitor, resolve, apply, controller, operationLogs,
             )
             editor = EditorViewModel(
                 profileRepository, settingsRepository, devices, monitor, gateway,
-                ApplyCurveUseCase(devices, gateway, operationLogs), resolve,
+                ApplyCurveUseCase(devices, gateway, operationLogs, settingsRepository), resolve,
                 SaveProfileUseCase(profileRepository),
                 SelectProfileForRouteUseCase(devices, settingsRepository, apply),
             )

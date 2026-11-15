@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-15
+
+### Added
+
+- 新增“设置 → 均衡器”，支持关闭应用侧最大增益限制或自定义阈值，默认仍为 +10 dB；设置持久保存，滑块、平移、文件导入、AutoEq 和应用配置统一遵循；
+- 正增益坐标与滑块随曲线向上扩展，关闭限制后不再被固定 +10 dB 挡住；
+- 增加 DapTune JSON v2，支持完整 signed Int Q4 范围；高于 +10 dB 的曲线自动导出 v2，其余曲线继续使用兼容旧版的 v1。
+
+### Fixed
+
+- 修复导出格式弹窗内列表项形成白色矩形底的问题，列表背景与弹窗主题一致；
+- 将默认增益保护与数据模型、厂商协议分离；降低上限不改写已有配置，超限配置在应用时明确提示，取消无意义重试；
+- 从设置返回时保留原标签页位置。
+
 ## [0.4.0] - 2026-11-15
 
 ### Added
@@ -118,7 +132,8 @@
 - Android signer certificate SHA-256:
   `79:62:1F:C9:4C:0C:56:C8:10:8C:BE:C8:32:28:81:7C:D0:6A:E6:1B:05:26:92:53:C3:2D:8D:D2:60:89:4E:F0`.
 
-[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/silverpoetry/DapTune/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/silverpoetry/DapTune/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/silverpoetry/DapTune/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/silverpoetry/DapTune/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/silverpoetry/DapTune/compare/v0.3.2...v0.3.3

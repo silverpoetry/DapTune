@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.weich.daptune.core.model.AppSettings
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.domain.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.IOException
@@ -28,6 +30,11 @@ class SettingsRepositoryImpl @Inject constructor(
         }
         .map { preferences ->
             AppSettings(
+                gainLimit = GainLimit(
+                    enabled = preferences[GainLimitEnabled] ?: true,
+                    maximumQ4 = preferences[GainLimitMaximumQ4]?.takeIf { it >= 0 }
+                        ?: GainLimit.DefaultMaximumQ4,
+                ),
                 automationEnabled = preferences[AutomationEnabled] ?: false,
                 selectedProfileId = preferences[SelectedProfile] ?: "builtin.flat",
                 defaultProfileId = preferences[DefaultProfile] ?: "builtin.flat",
@@ -36,6 +43,13 @@ class SettingsRepositoryImpl @Inject constructor(
                 lastUpdateCheckAtEpochMillis = preferences[LastUpdateCheckAt] ?: 0L,
             )
         }
+
+    override suspend fun setGainLimit(limit: GainLimit) {
+        context.dapTuneDataStore.edit {
+            it[GainLimitEnabled] = limit.enabled
+            it[GainLimitMaximumQ4] = limit.maximumQ4
+        }
+    }
 
     override suspend fun setSelectedProfile(profileId: String) {
         context.dapTuneDataStore.edit { it[SelectedProfile] = profileId }
@@ -62,6 +76,8 @@ class SettingsRepositoryImpl @Inject constructor(
     }
 
     private companion object {
+        val GainLimitEnabled = booleanPreferencesKey("gain_limit_enabled")
+        val GainLimitMaximumQ4 = intPreferencesKey("gain_limit_maximum_q4")
         val AutomationEnabled = booleanPreferencesKey("automation_enabled")
         val SelectedProfile = stringPreferencesKey("selected_profile_id")
         val DefaultProfile = stringPreferencesKey("default_profile_id")

@@ -327,7 +327,7 @@ class EqAutomationService : Service() {
                 lastAppliedRouteKey = null
                 lastAppliedCurveHash = null
                 notify(failureLabel(result, profile, route))
-                false
+                result.reason == com.weich.daptune.core.model.DapFailureReason.GAIN_LIMIT_EXCEEDED
             }
         }
     }
@@ -337,6 +337,7 @@ class EqAutomationService : Service() {
         profile: EqProfile,
         route: OutputRoute,
     ): String = when (failure.reason) {
+        com.weich.daptune.core.model.DapFailureReason.GAIN_LIMIT_EXCEEDED -> "超过增益上限 · 未应用"
         com.weich.daptune.core.model.DapFailureReason.DOLBY_DISABLED -> "杜比已关闭 · 等待恢复"
         com.weich.daptune.core.model.DapFailureReason.NO_CONTROL -> "音效控制权被占用"
         else -> "${profile.name} 未应用 · ${route.displayName}"

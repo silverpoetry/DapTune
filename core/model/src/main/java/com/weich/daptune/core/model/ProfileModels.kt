@@ -98,6 +98,7 @@ enum class VerificationState {
 }
 
 data class AppSettings(
+    val gainLimit: GainLimit = GainLimit(),
     val automationEnabled: Boolean = false,
     val selectedProfileId: String = "builtin.flat",
     val defaultProfileId: String = "builtin.flat",

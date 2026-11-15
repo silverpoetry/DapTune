@@ -34,8 +34,8 @@ audio, volume leveling, and every other Dolby parameter untouched.
 ### Curves and profiles
 
 - Edits the fixed 20 Dolby DAP center frequencies and stores every gain as signed Q4 (1/16 dB);
-- enforces a `+10 dB` boost ceiling without an artificial attenuation floor, while the graph and
-  gain axis expand for deeper cuts;
+- defaults to a `+10 dB` application gain ceiling that can be edited or disabled in Settings;
+  both axes expand with the curve, while actual DSP support remains device-dependent;
 - provides a large interactive graph and 20 tactile sliders with point selection, band locking,
   and a 0.5 dB interaction step;
 - saves, copies, overwrites, renames, and deletes custom profiles, with custom profiles listed
@@ -55,7 +55,7 @@ audio, volume leveling, and every other Dolby parameter untouched.
 - groups custom offsets, peak-to-zero, and mean-to-zero under Shift; all bands receive the same Q4
   offset, and out-of-range requests are rejected without reshaping the curve;
 - provides smoothing, flattening, and explicit hard threshold limiting separately; imported curves
-  above +10 dB are shifted down uniformly instead of scaled;
+  above an enabled, user-selected ceiling are shifted down uniformly instead of scaled;
 - converts non-native curves through deterministic log-frequency interpolation or a 48 kHz biquad
   magnitude response before the final 20-band Q4 quantization.
 
@@ -205,7 +205,7 @@ notification and confirm that the service remains visible under the system's act
 
 | Source | Supported input | Conversion |
 |---|---|---|
-| DapTune JSON v1 | Fixed 20-band signed Q4 | Lossless, no resampling |
+| DapTune JSON v1 / v2 | Fixed 20-band signed Q4 | Lossless parsing, no resampling; conversion follows gain settings |
 | GraphicEQ | Common Wavelet/AutoEq `GraphicEQ:` plus global `Preamp:` | Linear interpolation on a log-frequency axis |
 | ParametricEQ | `PK/PEQ`, `LS/LSC`, and `HS/HSC` plus global `Preamp:` | 48 kHz biquad magnitude response |
 | CSV / TSV / text table | Two frequency-gain columns or recognized headers | Linear interpolation on a log-frequency axis |
@@ -216,7 +216,7 @@ cannot be reduced to one 20-band magnitude curve are rejected explicitly rather 
 [Import formats](docs/import-formats.md) for the full grammar, header precedence, out-of-range
 behavior, and positive-gain overflow strategies.
 
-### DapTune JSON v1
+### DapTune JSON
 
 The recommended extension is `.daptune.json`. All six members are required and unknown members are
 rejected:
@@ -238,12 +238,14 @@ rejected:
 }
 ~~~
 
-`gains_q4` uses `dB = Q4 / 16`. The maximum value is `160` (`+10 dB`), and there is no
+`gains_q4` uses `dB = Q4 / 16`. Version 1 retains its `160` (`+10 dB`) ceiling; version 2 supports
+the full signed Int range. Curves above +10 dB export as v2; other curves export as v1. There is no
 application-level attenuation floor. There is no separate `preamp` field; a global attenuation is
 represented by subtracting the same Q4 value from all 20 bands.
 
-- [Normative DapTune JSON v1 specification](docs/daptune-json-format.md)
+- [Normative DapTune JSON v1 / v2 specification](docs/daptune-json-format.md)
 - [JSON Schema Draft 2020-12](docs/schema/daptune-profile-v1.schema.json)
+- [v2 Schema](docs/schema/daptune-profile-v2.schema.json)
 - [Flat example](examples/profiles/flat.daptune.json)
 - [Warm example](examples/profiles/warm.daptune.json)
 - [Deep-attenuation example](examples/profiles/deep-attenuation.daptune.json)
@@ -346,7 +348,7 @@ minimum redacted evidence needed for an issue.
 
 - [Installation, upgrade, and uninstallation](docs/installation.md)
 - [Compatibility and known limitations](docs/compatibility.md)
-- [DapTune JSON profile format v1](docs/daptune-json-format.md)
+- [DapTune JSON profile format](docs/daptune-json-format.md)
 - [Common equalizer import formats](docs/import-formats.md)
 - [System architecture](docs/architecture.md)
 - [Troubleshooting](docs/troubleshooting.md)

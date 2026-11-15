@@ -2,6 +2,7 @@ package com.weich.daptune.core.eq
 
 import com.weich.daptune.core.model.DapBandPlan
 import com.weich.daptune.core.model.EqCurve
+import com.weich.daptune.core.model.GainLimit
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,7 +51,7 @@ class EqTransformsTest {
 
         assertTrue(conversion.adjusted)
         assertEquals(-448, conversion.curve.toQ4List().min())
-        assertEquals(EqCurve.MAX_BOOST_Q4, conversion.curve.toQ4List().max())
+        assertEquals(GainLimit.DefaultMaximumQ4, conversion.curve.toQ4List().max())
         source.indices.forEach { index ->
             assertEquals(-8.0, conversion.curve.gainDb(index) - source[index], 0.0)
         }
@@ -93,7 +94,7 @@ class EqTransformsTest {
     @Test
     fun scaleAndQuantizeRejectUnrepresentableResults() {
         val source = EqCurve.ofDb(List(DapBandPlan.bandCount) { 6.0 })
-        assertThrows(IllegalArgumentException::class.java) { EqTransforms.scale(source, 2.0) }
+        assertEquals(12.0, EqTransforms.scale(source, 2.0).gainDb(0), 0.0)
         assertThrows(IllegalArgumentException::class.java) {
             EqTransforms.quantize(List(DapBandPlan.bandCount) { -1e12 }, OverflowMode.FIT)
         }
@@ -167,8 +168,18 @@ class EqTransformsTest {
         assertTrue(result.toDbList().max() <= 0.1)
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun limitMaximum_rejectsThresholdAboveDolbyLimit() {
-        EqTransforms.limitMaximum(EqCurve.flat(), 10.1)
+    @Test
+    fun customAndDisabledCeilingsAllowGenuineUpwardTranslation() {
+        val source = EqCurve.ofDb(List(DapBandPlan.bandCount) { if (it == 0) 10.0 else -20.0 })
+        val raised = EqTransforms.shift(source, 10.0, GainLimit.fromDb(true, 20.0))
+        assertEquals(20.0, raised.gainDb(0), 0.0)
+        assertEquals(-10.0, raised.gainDb(1), 0.0)
+        val normalized = EqTransforms.meanToZero(source, GainLimit(enabled = false))
+        assertEquals(0.0, normalized.toDbList().average(), 0.0)
+        assertEquals(30.0, normalized.gainDb(0) - normalized.gainDb(1), 0.0)
+        val unlimited = EqTransforms.quantize(raised.toDbList(), OverflowMode.FIT, GainLimit(enabled = false))
+        assertFalse(unlimited.adjusted)
+        assertEquals(raised, unlimited.curve)
+        assertEquals(15.0, EqTransforms.limitMaximum(raised, 15.0).gainDb(0), 0.0)
     }
 }

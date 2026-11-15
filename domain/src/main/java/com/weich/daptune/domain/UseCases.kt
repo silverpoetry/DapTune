@@ -11,6 +11,8 @@ import com.weich.daptune.core.model.DapApplyVerification
 import com.weich.daptune.core.model.DapApplyResult
 import com.weich.daptune.core.model.EqCurve
 import com.weich.daptune.core.model.EqProfile
+import com.weich.daptune.core.model.GainLimit
+import com.weich.daptune.core.model.DapFailureReason
 import com.weich.daptune.core.model.OutputRoute
 import com.weich.daptune.core.model.OperationLogAction
 import com.weich.daptune.core.model.OperationLogEntry
@@ -28,6 +30,7 @@ class ApplyProfileUseCase @Inject constructor(
     private val deviceRepository: DeviceRepository,
     private val dapGateway: DapGateway,
     private val operationLogs: OperationLogRepository,
+    private val settingsRepository: SettingsRepository,
 ) {
     suspend operator fun invoke(
         profileId: String,
@@ -50,7 +53,7 @@ class ApplyProfileUseCase @Inject constructor(
             )
             return failure
         }
-        val result = dapGateway.applyCurve(profile.curve)
+        val result = applyWithGainLimit(profile.curve, settingsRepository, dapGateway)
         val appliedAt = System.currentTimeMillis()
         when (result) {
             is DapApplyResult.Success -> deviceRepository.updateAppliedSnapshot(
@@ -82,13 +85,14 @@ class ApplyCurveUseCase @Inject constructor(
     private val deviceRepository: DeviceRepository,
     private val dapGateway: DapGateway,
     private val operationLogs: OperationLogRepository,
+    private val settingsRepository: SettingsRepository,
 ) {
     suspend operator fun invoke(
         profileId: String,
         curve: EqCurve,
         route: OutputRoute,
     ): DapApplyResult {
-        val result = dapGateway.applyCurve(curve)
+        val result = applyWithGainLimit(curve, settingsRepository, dapGateway)
         val appliedAt = System.currentTimeMillis()
         when (result) {
             is DapApplyResult.Success -> deviceRepository.updateAppliedSnapshot(
@@ -113,6 +117,20 @@ class ApplyCurveUseCase @Inject constructor(
         )
         return result
     }
+}
+
+private suspend fun applyWithGainLimit(
+    curve: EqCurve,
+    settings: SettingsRepository,
+    gateway: DapGateway,
+): DapApplyResult {
+    if (!settings.settings.first().gainLimit.allows(curve)) {
+        return DapApplyResult.Failure(
+            DapFailureReason.GAIN_LIMIT_EXCEEDED,
+            "曲线超过设置中的增益上限，请平移曲线或修改增益限制",
+        )
+    }
+    return gateway.applyCurve(curve)
 }
 
 internal fun DapApplyVerification.toSnapshotVerification(): VerificationState = when (this) {
@@ -245,8 +263,8 @@ class ImportCurveUseCase @Inject constructor() {
         format: CurveImportFormat = CurveImportFormat.AUTOMATIC,
     ): ImportedCurve = CurveFileCodec.import(text, fileName, format)
 
-    fun convert(imported: ImportedCurve, overflowMode: OverflowMode): EqCurve =
-        EqTransforms.quantize(imported.gainsDb, overflowMode).curve
+    fun convert(imported: ImportedCurve, overflowMode: OverflowMode, gainLimit: GainLimit = GainLimit()): EqCurve =
+        EqTransforms.quantize(imported.gainsDb, overflowMode, gainLimit).curve
 }
 
 data class AutoEqImportResult(
@@ -263,6 +281,7 @@ class ImportAutoEqProfileUseCase @Inject constructor(
     suspend operator fun invoke(
         profile: AutoEqProfile,
         overflowMode: OverflowMode = OverflowMode.FIT,
+        gainLimit: GainLimit = GainLimit(),
     ): AutoEqImportResult {
         val text = autoEqRepository.downloadGraphicEq(profile)
         val imported = importCurve.parse(
@@ -273,12 +292,12 @@ class ImportAutoEqProfileUseCase @Inject constructor(
         val saved = saveProfile(
             existingId = null,
             name = profile.name,
-            curve = importCurve.convert(imported, overflowMode),
+            curve = importCurve.convert(imported, overflowMode, gainLimit),
             source = ProfileSource.AUTO_EQ,
         )
         return AutoEqImportResult(
             profile = saved,
-            adjustedToBoostLimit = imported.exceedsLimit,
+            adjustedToBoostLimit = imported.exceedsLimit(gainLimit),
             warnings = imported.warnings,
         )
     }

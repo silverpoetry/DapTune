@@ -7,6 +7,7 @@ import com.weich.daptune.core.model.AutoEqProfile
 import com.weich.daptune.core.model.DeviceBinding
 import com.weich.daptune.core.model.EqCurve
 import com.weich.daptune.core.model.EqProfile
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.KnownOutputDevice
 import com.weich.daptune.core.model.OutputRoute
 import com.weich.daptune.core.model.OperationLogEntry
@@ -58,6 +59,8 @@ interface DeviceRepository {
 
 interface SettingsRepository {
     val settings: Flow<AppSettings>
+
+    suspend fun setGainLimit(limit: GainLimit)
 
     suspend fun setSelectedProfile(profileId: String)
 

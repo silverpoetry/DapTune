@@ -1,8 +1,8 @@
-# DapTune JSON 配置格式 v1
+# DapTune JSON 配置格式 v1 / v2
 
-本文定义 DapTune 原生配置文件 `com.weich.daptune.profile` 的版本 1。这里的要求与应用
-`CurveFileCodec` 的解码行为一致；[JSON Schema](schema/daptune-profile-v1.schema.json)和仓库校验脚本
-用于防止示例、文档与代码发生漂移。
+本文定义 `com.weich.daptune.profile` 的版本 1 和版本 2。两者字段、频点和 Q4 单位相同，区别仅在正增益
+表示范围。要求与 `CurveFileCodec` 一致；[v1 Schema](schema/daptune-profile-v1.schema.json)、
+[v2 Schema](schema/daptune-profile-v2.schema.json)及校验脚本共同约束文件契约。
 
 ## 1. 文件与编码
 
@@ -34,10 +34,10 @@
 
 ## 3. 字段定义
 
-| 字段 | JSON 类型 | v1 要求 |
+| 字段 | JSON 类型 | 要求 |
 |---|---:|---|
 | `format` | string | 必须严格等于 `com.weich.daptune.profile` |
-| `version` | integer | 必须严格等于 `1` |
+| `version` | integer | 必须严格等于 `1` 或 `2` |
 | `name` | string | 1–40 个 UTF-16 code unit；首尾不能是空白 |
 | `band_plan` | string | 必须严格等于 `dolby-dap-20-v1` |
 | `frequencies_hz` | integer array | 必须与下方 20 个中心频率逐项、按顺序完全一致 |
@@ -85,37 +85,41 @@ gains_q4 = round(gain_db * 16)
 约束如下：
 
 - 只接受 JSON integer；`1.0`、字符串 `"16"`、`NaN` 和无穷值都无效；
-- 最高值为 `160`，即 `+10 dB`；原生 DapTune JSON 不会自动压缩或裁切超限正增益；
+- v1 最大值为 `160`，即 `+10 dB`；v2 最大值为 `2147483647`，即 `134217727.9375 dB` 的数值表示范围；
 - 最低技术边界是 Kotlin `Int` 的 `-2147483648`，应用不再人为设置 `-10 dB` 等衰减下限；
 - 没有独立 `preamp` 字段。需要整体预衰减时，应直接从全部 20 个 Q4 值中减去相同数值；
-- 极端负值虽然能被文件和领域模型表示，厂商 DSP 仍可能夹限、忽略或产生静音。创建者应使用合理范围并
+- 数值能被文件和领域模型表示不等于厂商 DSP 支持，设备仍可能夹限、拒绝或忽略。创建者应使用合理范围并
   在目标设备上低音量验证。
 
-Q4 是无损交换格式。应用导出再导入不会经过浮点采样；手写 dB 转 Q4 时才需要自行决定取整策略。
+Q4 是无损交换格式。解码不重采样；手写 dB 转 Q4 时才需要决定取整策略。导入转换另受用户的增益上限
+设置约束：启用时超限曲线会整体下移到阈值并提示；若需保留全部原值，应先关闭限制或提高阈值。
 
 应用内可从调音页顶部“导出曲线”或配置卡片“更多 → 导出”选择 DapTune JSON。调音页导出当前编辑结果，
-配置卡片导出已保存的配置；导出不会自动保存或应用曲线。文件名使用 `.daptune.json` 后缀，格式版本仍为 1。
+配置卡片导出已保存的配置；导出不会自动保存或应用曲线。文件名使用 `.daptune.json` 后缀。
+若任一频段高于 +160 Q4，自动导出 v2；否则仍导出 v1，以便旧版应用读取。导出不受当前上限设置影响。
 
 ## 6. 解码与拒绝条件
 
-应用按以下规则处理 v1 文件：
+应用按以下规则解码：
 
 1. JSON 必须能严格解码成已定义对象，缺失字段或未知字段直接失败；
 2. 检查 `format` 和 `version`；
 3. 检查 `band_plan` 和完整频点数组；
 4. 检查规范化名称；
-5. 检查 20 个 Q4 整数及 `+160` 上限；
-6. 成功后以 `DAPTUNE_FILE` 来源保存，Q4 数组保持原值。
+5. 检查 20 个 signed Int Q4；v1 额外检查 `+160` 上限，v2 不施加产品层上限；
+6. 通过版本检查后，再按用户增益设置转换，以 `DAPTUNE_FILE` 来源保存。
 
 错误文件不会回退到 GraphicEQ、ParametricEQ 或 CSV 解析器。用户在导入菜单明确选择
 “DapTune 配置（JSON）”时也遵循同一规则。
 
 ## 7. Schema 和例子
 
-- [JSON Schema Draft 2020-12](schema/daptune-profile-v1.schema.json)
+- [v1 Schema Draft 2020-12](schema/daptune-profile-v1.schema.json)
+- [v2 Schema Draft 2020-12](schema/daptune-profile-v2.schema.json)
 - [平直](../examples/profiles/flat.daptune.json)
 - [暖厚](../examples/profiles/warm.daptune.json)
 - [深衰减](../examples/profiles/deep-attenuation.daptune.json)
+- [扩展正增益 v2](../examples/profiles/extended-gain.daptune.json)（用于说明格式，不是设备调音建议）
 
 在仓库根目录执行：
 
@@ -123,11 +127,11 @@ Q4 是无损交换格式。应用导出再导入不会经过浮点采样；手�
 node .\tools\validate-profile-contract.mjs
 ```
 
-校验会从 Kotlin 领域模型读取频点、频段数、Q4 比例和正增益上限，再核对 Schema 与全部示例；它还会
+校验会从 Kotlin 代码读取频点、频段数、Q4 比例和文件版本边界，再核对两份 Schema 与全部示例；它还会
 保证 `warm.daptune.json` 与应用内置“暖厚”曲线逐 Q4 完全相同。
 
 ## 8. 版本兼容策略
 
-v1 读取器只读取版本 1，不假设未知版本向后兼容。新增可选语义、频点计划或单位时，应先定义新版本和
-迁移规则；不得向 v1 对象直接增加成员，因为 v1 明确拒绝未知字段。这种封闭策略让拼写错误和不完整转换
-尽早失败，而不是静默生成错误曲线。
+DapTune 0.5.0 起可读取 v1 和 v2；旧版只认识 v1，会拒绝 v2。v2 扩展了数值表示范围，没有新增成员，
+也没有更换 `dolby-dap-20-v1` 频点计划。v1 的旧契约保持不变，不能用 `version: 1` 携带超出其范围的值。
+修改用户的增益设置不会改变这些格式规则，也不代表改变厂商 DSP 的硬件或固件限制。

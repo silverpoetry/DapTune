@@ -143,6 +143,8 @@ class ResolveProfileForRouteUseCaseTest {
             AppSettings(defaultProfileId = defaultProfileId),
         )
 
+        override suspend fun setGainLimit(limit: com.weich.daptune.core.model.GainLimit) = Unit
+
         override suspend fun setSelectedProfile(profileId: String) = Unit
 
         override suspend fun setDefaultProfile(profileId: String) = Unit

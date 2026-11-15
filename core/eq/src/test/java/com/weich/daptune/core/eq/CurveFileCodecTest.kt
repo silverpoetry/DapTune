@@ -2,12 +2,25 @@ package com.weich.daptune.core.eq
 
 import com.weich.daptune.core.model.DapBandPlan
 import com.weich.daptune.core.model.EqCurve
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.ProfileSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CurveFileCodecTest {
+    @Test
+    fun extendedGainExportsV2AndRoundTripsWithoutAnEnabledCeiling() {
+        val curve = EqCurve.ofQ4(List(DapBandPlan.bandCount) { if (it == 0) 320 else -400 })
+        val text = CurveFileCodec.exportNative("Extended", curve)
+        assertTrue(text.contains("\"version\": 2"))
+        val imported = CurveFileCodec.import(text, "extended.daptune.json")
+        assertEquals(curve, EqTransforms.quantize(imported.gainsDb, OverflowMode.FIT, GainLimit(enabled = false)).curve)
+        org.junit.Assert.assertThrows(CurveImportException::class.java) {
+            CurveFileCodec.import(text.replace("\"version\": 2", "\"version\": 1"), "invalid-v1.json")
+        }
+    }
+
     @Test
     fun exportedDocumentsPreserveQ4AndUseSafeFileNames() {
         val curve = EqCurve.ofQ4(List(DapBandPlan.bandCount) { (it - 10) * 17 })
@@ -141,7 +154,7 @@ class CurveFileCodecTest {
         )
 
         assertEquals(-30.0, imported.minimumDb, 0.001)
-        assertTrue(!imported.exceedsLimit)
+        assertTrue(!imported.exceedsLimit())
     }
 
     @Test

@@ -9,6 +9,7 @@ import com.weich.daptune.core.model.DapApplyVerification
 import com.weich.daptune.core.model.DapCapability
 import com.weich.daptune.core.model.EqCurve
 import com.weich.daptune.core.model.EqProfile
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.OutputRoute
 import com.weich.daptune.core.model.ProfileSource
 import com.weich.daptune.domain.ApplyCurveUseCase
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class EditorUiState(
+    val gainLimit: GainLimit = GainLimit(),
     val profiles: List<EqProfile> = emptyList(),
     val selectedProfileId: String = "builtin.flat",
     val loadedProfileId: String? = null,
@@ -65,6 +67,7 @@ sealed interface EditorEvent {
 }
 
 private data class EditorSources(
+    val gainLimit: GainLimit,
     val profiles: List<EqProfile>,
     val resolvedProfile: EqProfile?,
     val storedSelectedProfileId: String,
@@ -101,6 +104,7 @@ class EditorViewModel @Inject constructor(
                 deviceRepository.appliedSnapshot,
             ) { profiles, settings, _, route, snapshot ->
                 EditorSources(
+                    gainLimit = settings.gainLimit,
                     profiles = profiles,
                     resolvedProfile = resolveProfileForRoute(route),
                     storedSelectedProfileId = settings.selectedProfileId,
@@ -145,7 +149,7 @@ class EditorViewModel @Inject constructor(
     fun setGain(index: Int, valueQ4: Int) {
         mutableState.update {
             it.copy(
-                curve = it.curve.withGainQ4(index, valueQ4.coerceAtMost(EqCurve.MAX_BOOST_Q4)),
+                curve = it.curve.withGainQ4(index, it.gainLimit.constrain(valueQ4)),
                 selectedBand = index,
             )
         }
@@ -166,7 +170,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun shift(offsetDb: Double) = updateCurve { EqTransforms.shift(it, offsetDb) }
+    fun shift(offsetDb: Double) = updateCurve { EqTransforms.shift(it, offsetDb, mutableState.value.gainLimit) }
 
     fun limitMaximum(thresholdDb: Double) = updateCurve { EqTransforms.limitMaximum(it, thresholdDb) }
 
@@ -252,6 +256,7 @@ class EditorViewModel @Inject constructor(
             val selectionChanged = selected != null && current.loadedProfileId != selected.id
             if (selectionChanged) {
                 current.copy(
+                    gainLimit = sources.gainLimit,
                     profiles = sources.profiles,
                     selectedProfileId = selected.id,
                     loadedProfileId = selected.id,
@@ -262,6 +267,7 @@ class EditorViewModel @Inject constructor(
                 )
             } else {
                 current.copy(
+                    gainLimit = sources.gainLimit,
                     profiles = sources.profiles,
                     selectedProfileId = selected?.id ?: current.selectedProfileId,
                     route = sources.route,

@@ -42,6 +42,7 @@ sealed interface DapApplyResult {
 }
 
 enum class DapFailureReason {
+    GAIN_LIMIT_EXCEEDED,
     UNSUPPORTED,
     NO_CONTROL,
     DOLBY_DISABLED,

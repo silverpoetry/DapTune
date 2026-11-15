@@ -49,7 +49,7 @@ class ImportAutoEqProfileUseCaseTest {
         val result = useCase(upstream.profile)
 
         assertTrue(result.adjustedToBoostLimit)
-        assertEquals(EqCurve.MAX_BOOST_DB.toDouble(), result.profile.curve.toDbList().max(), 0.0)
+        assertEquals(10.0, result.profile.curve.toDbList().max(), 0.0)
     }
 
     private class AutoEqRepositoryStub(

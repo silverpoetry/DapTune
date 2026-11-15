@@ -2,6 +2,7 @@ package com.weich.daptune.core.eq
 
 import com.weich.daptune.core.model.DapBandPlan
 import com.weich.daptune.core.model.EqCurve
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.ProfileSource
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -22,8 +23,8 @@ data class ImportedCurve(
 ) {
     val minimumDb: Double get() = gainsDb.min()
     val maximumDb: Double get() = gainsDb.max()
-    val exceedsLimit: Boolean
-        get() = maximumDb > EqCurve.MAX_BOOST_DB
+    fun exceedsLimit(gainLimit: GainLimit = GainLimit()): Boolean =
+        gainLimit.enabled && maximumDb > gainLimit.maximumDb
 }
 
 class CurveImportException(message: String, cause: Throwable? = null) :
@@ -49,7 +50,9 @@ object CurveFileCodec {
     const val MAX_IMPORT_CHARACTERS: Int = 1_000_000
 
     private const val FileFormat = "com.weich.daptune.profile"
-    private const val FileVersion = 1
+    private const val LegacyFileVersion = 1
+    private const val ExtendedFileVersion = 2
+    private const val LegacyMaximumGainQ4 = 160
     private const val DefaultSampleRate = 48_000.0
 
     private val json = Json {
@@ -101,7 +104,7 @@ object CurveFileCodec {
         return json.encodeToString(
             ProfileFileDto(
                 format = FileFormat,
-                version = FileVersion,
+                version = if (curve.toQ4List().any { it > LegacyMaximumGainQ4 }) ExtendedFileVersion else LegacyFileVersion,
                 name = name,
                 bandPlan = DapBandPlan.id,
                 frequenciesHz = DapBandPlan.frequenciesHz.asList(),
@@ -138,7 +141,7 @@ object CurveFileCodec {
 
     private fun importNative(text: String, fileName: String): ImportedCurve {
         val dto = json.decodeFromString<ProfileFileDto>(text)
-        if (dto.format != FileFormat || dto.version != FileVersion) {
+        if (dto.format != FileFormat || dto.version !in LegacyFileVersion..ExtendedFileVersion) {
             throw CurveImportException("不支持的 DapTune 文件版本")
         }
         if (dto.bandPlan != DapBandPlan.id || dto.frequenciesHz != DapBandPlan.frequenciesHz.asList()) {
@@ -148,10 +151,13 @@ object CurveFileCodec {
         if (!isCanonicalProfileName(dto.name)) {
             throw CurveImportException("配置名称必须为 1–$MaxProfileNameLength 个字符")
         }
+        if (dto.version == LegacyFileVersion && dto.gainsQ4.any { it > LegacyMaximumGainQ4 }) {
+            throw CurveImportException("v1 文件的增益不能超过 +10 dB；更高增益请使用 v2 格式")
+        }
         val curve = try {
             EqCurve.ofQ4(dto.gainsQ4)
         } catch (error: IllegalArgumentException) {
-            throw CurveImportException("文件中的正增益超过 +${EqCurve.MAX_BOOST_DB} dB", error)
+            throw CurveImportException("文件中的增益数组无效", error)
         }
         return ImportedCurve(
             suggestedName = profileName,

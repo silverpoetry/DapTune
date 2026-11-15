@@ -9,6 +9,7 @@ import com.weich.daptune.core.model.DapCapability
 import com.weich.daptune.core.model.DeviceBinding
 import com.weich.daptune.core.model.EqCurve
 import com.weich.daptune.core.model.EqProfile
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.model.KnownOutputDevice
 import com.weich.daptune.core.model.OutputRoute
 import com.weich.daptune.core.model.OutputRouteType
@@ -21,6 +22,25 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SelectProfileForRouteUseCaseTest {
+    @Test
+    fun applicationUsesCurrentGainPolicyWithoutChangingStoredCurve() = runBlocking {
+        val calls = mutableListOf<String>()
+        val devices = RecordingDeviceRepository(calls)
+        val settings = RecordingSettingsRepository(calls)
+        val profile = profile("high").copy(curve = EqCurve.ofDb(List(20) { 20.0 }))
+        val apply = ApplyProfileUseCase(
+            ProfileRepositoryStub(profile), devices, RecordingDapGateway(calls), RecordingOperationLogRepository(), settings,
+        )
+        assertEquals(
+            com.weich.daptune.core.model.DapFailureReason.GAIN_LIMIT_EXCEEDED,
+            (apply(profile.id, OutputRoute.Speaker) as DapApplyResult.Failure).reason,
+        )
+        org.junit.Assert.assertFalse(calls.any { it.startsWith("apply:") })
+        settings.setGainLimit(GainLimit(enabled = false))
+        org.junit.Assert.assertTrue(apply(profile.id, OutputRoute.Speaker) is DapApplyResult.Success)
+        assertEquals(20.0, profile.curve.gainDb(0), 0.0)
+    }
+
     @Test
     fun selectionUpdatesCurrentRouteBindingBeforeEditorSelection() = runBlocking {
         val calls = mutableListOf<String>()
@@ -43,6 +63,7 @@ class SelectProfileForRouteUseCaseTest {
                 deviceRepository,
                 dapGateway,
                 RecordingOperationLogRepository(),
+                settingsRepository,
             ),
         )(
             profileId = "custom.reference",
@@ -152,6 +173,10 @@ class SelectProfileForRouteUseCaseTest {
         override val settings: Flow<AppSettings> = mutableSettings
 
         var selectedProfileId: String? = null
+
+        override suspend fun setGainLimit(limit: GainLimit) {
+            mutableSettings.value = mutableSettings.value.copy(gainLimit = limit)
+        }
 
         override suspend fun setSelectedProfile(profileId: String) {
             selectedProfileId = profileId

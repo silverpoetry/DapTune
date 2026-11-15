@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesomeMotion
@@ -110,12 +111,21 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
     val state by appViewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showAbout by rememberSaveable { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    val pagerState = rememberPagerState(pageCount = { AppDestination.entries.size })
 
     LaunchedEffect(Unit) {
         appViewModel.checkForUpdatesAutomatically(BuildConfig.VERSION_NAME)
     }
 
-    if (showAbout) {
+    if (showSettings) {
+        SettingsScreen(
+            state = state,
+            onChange = appViewModel::setGainLimit,
+            onErrorShown = appViewModel::dismissGainLimitError,
+            onBack = { showSettings = false },
+        )
+    } else if (showAbout) {
         AboutScreen(
             versionName = BuildConfig.VERSION_NAME,
             state = AboutUiState(
@@ -140,7 +150,7 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
             onOpenPrivacyPolicy = { openUrl(context, PrivacyUrl) },
         )
     } else {
-        MainPager(onOpenAbout = { showAbout = true })
+        MainPager(pagerState, onOpenAbout = { showAbout = true }, onOpenSettings = { showSettings = true })
     }
 
     state.pendingUpdateAnnouncement?.let { release ->
@@ -166,9 +176,8 @@ private fun DapTuneApp(appViewModel: AppViewModel) {
 }
 
 @Composable
-private fun MainPager(onOpenAbout: () -> Unit) {
+private fun MainPager(pagerState: PagerState, onOpenAbout: () -> Unit, onOpenSettings: () -> Unit) {
     val destinations = AppDestination.entries
-    val pagerState = rememberPagerState(pageCount = { destinations.size })
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -205,9 +214,9 @@ private fun MainPager(onOpenAbout: () -> Unit) {
             key = { destinations[it].name },
         ) {
             when (destinations[it]) {
-                AppDestination.Editor -> EditorScreen()
+                AppDestination.Editor -> EditorScreen(onOpenSettings = onOpenSettings)
                 AppDestination.Profiles -> ProfilesScreen(isActive = pagerState.currentPage == it)
-                AppDestination.Automation -> AutomationScreen(onOpenAbout = onOpenAbout)
+                AppDestination.Automation -> AutomationScreen(onOpenAbout = onOpenAbout, onOpenSettings = onOpenSettings)
             }
         }
     }

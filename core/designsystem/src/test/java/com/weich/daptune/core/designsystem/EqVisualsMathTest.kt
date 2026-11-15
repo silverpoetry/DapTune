@@ -7,15 +7,26 @@ import org.junit.Test
 
 class EqVisualsMathTest {
     @Test
+    fun `axis and dragging expand above ten without hidden clipping`() {
+        val curve = EqCurve.ofQ4(List(20) { 320 })
+        val axis = gainAxisFor(curve)
+        org.junit.Assert.assertTrue(axis.maximumQ4 > 320)
+        assertEquals(axis.maximumQ4, gainAt(-1000f, axis))
+        assertEquals(320, gainAxisFor(curve, ceilingQ4 = 320).maximumQ4)
+        org.junit.Assert.assertTrue(gainAxisFor(curve, ceilingQ4 = 160).maximumQ4 >= 320)
+        assertEquals(0, gainAxisFor(EqCurve.flat(), ceilingQ4 = 0).maximumQ4)
+    }
+
+    @Test
     fun `track endpoints and center map to exact gains`() {
-        assertEquals(EqCurve.MAX_BOOST_Q4, gainAt(y = 12f, axis = DefaultAxis))
+        assertEquals(DefaultAxisExtentQ4, gainAt(y = 12f, axis = DefaultAxis))
         assertEquals(0, gainAt(y = 150f, axis = DefaultAxis))
-        assertEquals(-EqCurve.MAX_BOOST_Q4, gainAt(y = 288f, axis = DefaultAxis))
+        assertEquals(-DefaultAxisExtentQ4, gainAt(y = 288f, axis = DefaultAxis))
     }
 
     @Test
     fun `track position is always clamped and snapped to half decibel`() {
-        assertEquals(EqCurve.MAX_BOOST_Q4, gainAt(y = -1_000f, axis = ExpandedAxis))
+        assertEquals(DefaultAxisExtentQ4, gainAt(y = -1_000f, axis = ExpandedAxis))
         assertEquals(-320, gainAt(y = 1_000f, axis = ExpandedAxis))
         assertEquals(0, gainAt(y = 153f, axis = ExpandedAxis) % (EqCurve.Q4_PER_DB / 2))
     }
@@ -35,8 +46,8 @@ class EqVisualsMathTest {
 
     @Test
     fun `axis defaults to plus or minus ten and expands downward`() {
-        assertEquals(EqCurve.MAX_BOOST_Q4, DefaultAxis.maximumQ4)
-        assertEquals(-EqCurve.MAX_BOOST_Q4, DefaultAxis.minimumQ4)
+        assertEquals(DefaultAxisExtentQ4, DefaultAxis.maximumQ4)
+        assertEquals(-DefaultAxisExtentQ4, DefaultAxis.minimumQ4)
         assertEquals(-320, ExpandedAxis.minimumQ4)
         assertEquals(
             listOf(160, 80, 0, -80, -160, -240, -320),

@@ -29,7 +29,7 @@ DapTune 不处理或转发 PCM，不读取录音，不替换 Android 音频路�
 ### 曲线与配置
 
 - 编辑 Dolby DAP 固定 20 个中心频点，内部使用 signed Q4（1/16 dB）保存和写入；
-- 正增益最高 `+10 dB`，不人为设置最大衰减；预览和纵轴会随实际负增益动态扩展；
+- 应用侧最大增益默认 `+10 dB`，可在设置中修改或关闭；正负增益坐标动态扩展，厂商实际支持范围由设备决定；
 - 大尺寸交互曲线和 20 段触感滑杆支持点选频点、锁定频段和 0.5 dB 操作步进；
 - 保存、复制、覆盖、重命名和删除自定义配置，自定义配置优先排列；
 - 提供平直、暖厚、澎湃、响度、人声、明亮和柔和等内置起点。
@@ -42,7 +42,7 @@ DapTune 不处理或转发 PCM，不读取录音，不替换 Android 音频路�
 - 支持自动识别，也允许明确指定来源；显式选择后不会静默切换到其他解析器；
 - 调音页及配置卡片支持导出无损 DapTune JSON 或 GraphicEQ 文本，调音页导出包含尚未保存的修改；
 - “平移”菜单提供自定偏移量、峰值归零和均值归零，统一移动全部频段；超限会提示，不改变曲线形状；
-- 平滑、全部归零与硬阈值截平独立提供；超限文件导入默认整体下移至 +10 dB，不再等比压缩；
+- 平滑、全部归零与硬阈值截平独立提供；导入时若启用了增益上限，超限曲线会整体下移至设定值；
 - 对非原生曲线使用确定性的对数频率插值或 48 kHz biquad 幅频采样，再统一量化到 20 段 Q4。
 
 ### 设备自动切换
@@ -164,7 +164,7 @@ Android 13+ 拒绝通知权限时，AOSP 仍允许前台服务运行，但通知
 
 | 来源 | 支持范围 | 转换 |
 |---|---|---|
-| DapTune JSON v1 | 固定 20 段 signed Q4 | 无损，不重采样 |
+| DapTune JSON v1 / v2 | 固定 20 段 signed Q4 | 解析无损，不重采样；转换遵循增益设置 |
 | GraphicEQ | Wavelet、AutoEq 常见 `GraphicEQ:` 与全局 `Preamp:` | 对数频率轴线性插值 |
 | ParametricEQ | `PK/PEQ`、`LS/LSC`、`HS/HSC`，可含全局 `Preamp:` | 按 48 kHz 求 biquad 幅频响应 |
 | CSV / TSV / 文本表 | 两列频率与增益，或受支持的表头 | 对数频率轴线性插值 |
@@ -174,7 +174,7 @@ Android 13+ 拒绝通知权限时，AOSP 仍允许前台服务运行，但通知
 曲线的指令；应用会明确拒绝，而不是静默丢弃。完整语法、表头优先级、超范围行为和正增益超限策略见
 [导入格式说明](docs/import-formats.md)。
 
-### DapTune JSON v1
+### DapTune JSON
 
 原生格式扩展名建议为 `.daptune.json`，六个字段全部必填，未知字段会被拒绝：
 
@@ -195,11 +195,13 @@ Android 13+ 拒绝通知权限时，AOSP 仍允许前台服务运行，但通知
 }
 ~~~
 
-`gains_q4` 使用 `dB = Q4 / 16`；最大值是 `160`（`+10 dB`），负值没有产品层人为下限。
+`gains_q4` 使用 `dB = Q4 / 16`。v1 的最大值保持 `160`（`+10 dB`）；v2 支持完整 signed Int 范围。
+高于 +10 dB 时自动导出 v2，普通曲线继续导出 v1。文件表示范围与应用侧增益设置、厂商实际支持范围相互独立。
 没有独立 `preamp` 字段，整体预衰减应直接减去全部 20 个 Q4 值。
 
-- [完整 DapTune JSON v1 规范](docs/daptune-json-format.md)
+- [完整 DapTune JSON v1 / v2 规范](docs/daptune-json-format.md)
 - [JSON Schema Draft 2020-12](docs/schema/daptune-profile-v1.schema.json)
+- [v2 Schema](docs/schema/daptune-profile-v2.schema.json)
 - [平直示例](examples/profiles/flat.daptune.json)
 - [暖厚示例](examples/profiles/warm.daptune.json)
 - [深衰减示例](examples/profiles/deep-attenuation.daptune.json)
@@ -290,7 +292,7 @@ Wrapper、JVM 单元测试、Android Lint 和 R8 Release 构建。`v*` 标签发
 
 - [安装、更新与卸载](docs/installation.md)
 - [兼容性与已知限制](docs/compatibility.md)
-- [DapTune JSON 配置格式 v1](docs/daptune-json-format.md)
+- [DapTune JSON 配置格式](docs/daptune-json-format.md)
 - [常见均衡器导入格式](docs/import-formats.md)
 - [系统架构](docs/architecture.md)
 - [问题排查](docs/troubleshooting.md)

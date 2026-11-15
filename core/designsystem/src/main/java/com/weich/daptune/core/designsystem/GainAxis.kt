@@ -48,11 +48,14 @@ class GainAxis internal constructor(
     }
 }
 
-fun gainAxisFor(curve: EqCurve): GainAxis =
-    gainAxisForMinimum(curve.toQ4List().min())
+fun gainAxisFor(curve: EqCurve, ceilingQ4: Int? = null): GainAxis =
+    gainAxisForRange(curve.toQ4List().min(), curve.toQ4List().max(), ceilingQ4)
 
-internal fun gainAxisForMinimum(minimumQ4: Int): GainAxis {
-    val defaultMinimumQ4 = -EqCurve.MAX_BOOST_Q4
+internal fun gainAxisForMinimum(minimumQ4: Int): GainAxis =
+    gainAxisForRange(minimumQ4, 0, DefaultAxisExtentQ4)
+
+private fun gainAxisForRange(minimumQ4: Int, maximumQ4: Int, ceilingQ4: Int?): GainAxis {
+    val defaultMinimumQ4 = -DefaultAxisExtentQ4
     val needsHeadroom = minimumQ4 < defaultMinimumQ4 + AxisHeadroomQ4
     val requiredMinimumQ4 = if (needsHeadroom) {
         (minimumQ4.toLong() - AxisHeadroomQ4)
@@ -60,7 +63,15 @@ internal fun gainAxisForMinimum(minimumQ4: Int): GainAxis {
     } else {
         defaultMinimumQ4.toLong()
     }
-    val requiredRangeQ4 = EqCurve.MAX_BOOST_Q4.toLong() - requiredMinimumQ4
+    val positiveHeadroom = if (maximumQ4 > DefaultAxisExtentQ4 - AxisHeadroomQ4) {
+        (maximumQ4.toLong() + AxisHeadroomQ4).coerceAtMost(Int.MAX_VALUE.toLong())
+    } else DefaultAxisExtentQ4.toLong()
+    // Existing curves must remain visible even if the user subsequently lowers the edit ceiling.
+    val requiredMaximumQ4 = maxOf(
+        maximumQ4.toLong(),
+        positiveHeadroom.coerceAtMost(ceilingQ4?.toLong() ?: Int.MAX_VALUE.toLong()),
+    )
+    val requiredRangeQ4 = requiredMaximumQ4 - requiredMinimumQ4
     val majorStepQ4 = niceMajorStepQ4(requiredRangeQ4)
     val alignedMinimumQ4 =
         (Math.floorDiv(requiredMinimumQ4, majorStepQ4.toLong()) * majorStepQ4.toLong())
@@ -71,7 +82,10 @@ internal fun gainAxisForMinimum(minimumQ4: Int): GainAxis {
             .roundToInt()
             .coerceAtLeast(GainStepQ4)
     return GainAxis(
-        maximumQ4 = EqCurve.MAX_BOOST_Q4,
+        maximumQ4 = (ceil(requiredMaximumQ4.toDouble() / majorStepQ4) * majorStepQ4)
+            .toLong().coerceAtMost(Int.MAX_VALUE.toLong())
+            .coerceAtMost(maxOf(maximumQ4.toLong(), ceilingQ4?.toLong() ?: Int.MAX_VALUE.toLong()))
+            .toInt(),
         minimumQ4 = alignedMinimumQ4,
         majorStepQ4 = majorStepQ4,
         minorStepQ4 = minorStepQ4,
@@ -95,6 +109,7 @@ private fun niceMajorStepQ4(rangeQ4: Long): Int {
 }
 
 internal const val GainStepQ4 = EqCurve.Q4_PER_DB / 2
+internal const val DefaultAxisExtentQ4 = 10 * EqCurve.Q4_PER_DB
 private const val AxisHeadroomQ4 = EqCurve.Q4_PER_DB
 private const val MinimumMajorStepQ4 = 5 * EqCurve.Q4_PER_DB
 private const val TargetMajorIntervals = 7.0

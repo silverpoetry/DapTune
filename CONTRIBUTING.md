@@ -25,7 +25,7 @@ CI 使用未签名 R8 Release 验证源码。不要提交本机 keystore 或通�
 
 1. 领域模型和 EQ 数学保持纯 Kotlin，Android 与厂商 API 留在 `platform:*`；
 2. UI、数据层和路由层不得复制 DAP payload 编码或各自维护频点表；
-3. 20 段曲线始终使用 signed Q4，正增益最高 `+160`，不要重新引入人为衰减下限；
+3. 20 段曲线始终使用 signed Int Q4；应用增益上限由用户设置，不得硬编码为厂商上限，也不要加入人为衰减下限；
 4. 新 DAP 分支必须基于 descriptor/protocol 证据，不按营销名称或设备型号猜测；
 5. 不把 setter-only 零缓冲区当作真实回读，不把“命令接受”描述为“曲线已验证”；
 6. DAP 写入必须串行、释放 effect，并为部分写入提供明确失败语义；

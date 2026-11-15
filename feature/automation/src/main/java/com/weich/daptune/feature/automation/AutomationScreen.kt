@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.SettingsInputHdmi
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Speaker
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -104,6 +105,7 @@ fun AutomationScreen(
     modifier: Modifier = Modifier,
     viewModel: AutomationViewModel = hiltViewModel(),
     onOpenAbout: () -> Unit = {},
+    onOpenSettings: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -163,6 +165,11 @@ fun AutomationScreen(
             DapTuneTopAppBar(
                 title = "自动切换",
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Outlined.Settings, contentDescription = "设置")
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },

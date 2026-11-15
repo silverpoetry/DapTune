@@ -551,7 +551,7 @@ fun formatGain(valueQ4: Int): String {
 
 private fun snapGainQ4(valueQ4: Int): Int =
     ((valueQ4.toDouble() / GainStepQ4).roundToLong() * GainStepQ4)
-        .coerceIn(Int.MIN_VALUE.toLong(), EqCurve.MAX_BOOST_Q4.toLong())
+        .coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong())
         .toInt()
 
 internal fun gainQ4ForTrackPosition(
@@ -563,7 +563,7 @@ internal fun gainQ4ForTrackPosition(
     val usable = (trackHeightPx - verticalInsetPx * 2f).coerceAtLeast(1f)
     val fraction = ((yPx - verticalInsetPx) / usable).coerceIn(0f, 1f)
     val raw = axis.maximumQ4.toDouble() - fraction * axis.rangeQ4
-    return snapGainQ4(raw.roundToInt()).coerceAtLeast(axis.minimumQ4)
+    return snapGainQ4(raw.roundToInt()).coerceIn(axis.minimumQ4, axis.maximumQ4)
 }
 
 internal fun trackYForGainQ4(

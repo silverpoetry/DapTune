@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -122,19 +123,20 @@ class ProfilesViewModel @Inject constructor(
         viewModelScope.launch {
             runSuspendCatching {
                 val imported = importCurve.parse(text, fileName, format)
-                val curve = importCurve.convert(imported, overflowMode)
+                val gainLimit = settingsRepository.settings.first().gainLimit
+                val curve = importCurve.convert(imported, overflowMode, gainLimit)
                 val saved = saveProfile(
                     existingId = null,
                     name = imported.suggestedName,
                     curve = curve,
                     source = imported.source,
                 )
-                Triple(saved, imported.exceedsLimit, imported.warnings)
+                Triple(saved, imported.exceedsLimit(gainLimit), imported.warnings)
             }.onSuccess { (saved, adjusted, warnings) ->
                 selectProfileForRoute(saved.id, route)
                 val adjustment = if (!adjusted) "" else when (overflowMode) {
-                    OverflowMode.FIT -> "；已整体下移至 +10 dB 上限"
-                    OverflowMode.CLAMP -> "；已截平超过 +10 dB 的频段"
+                    OverflowMode.FIT -> "；已按增益上限整体下移"
+                    OverflowMode.CLAMP -> "；已按增益上限截平"
                 }
                 val detail = warnings.joinToString(separator = "；", prefix = if (warnings.isEmpty()) "" else "；")
                 messageChannel.send("已导入“${saved.name}”$adjustment$detail")
@@ -178,14 +180,14 @@ class ProfilesViewModel @Inject constructor(
                 it.copy(importingPath = profile.relativePath, errorMessage = null)
             }
             try {
-                val imported = importAutoEqProfile(profile)
+                val imported = importAutoEqProfile(profile, gainLimit = settingsRepository.settings.first().gainLimit)
                 val route = mutableState.value.currentRoute
                 val applyResult = selectProfileForRoute(imported.profile.id, route)
                 mutableAutoEqState.update {
                     it.copy(lastImportedPath = profile.relativePath)
                 }
                 val adjustment = if (imported.adjustedToBoostLimit) {
-                    "；已整体下移至 +10 dB 上限"
+                    "；已按增益上限整体下移"
                 } else {
                     ""
                 }

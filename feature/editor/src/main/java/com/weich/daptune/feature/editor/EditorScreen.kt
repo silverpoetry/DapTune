@@ -80,6 +80,7 @@ import com.weich.daptune.core.designsystem.gainAxisFor
 import com.weich.daptune.core.model.DapBandPlan
 import com.weich.daptune.core.model.EqProfile
 import com.weich.daptune.core.model.EqCurve
+import com.weich.daptune.core.model.GainLimit
 import com.weich.daptune.core.eq.EqTransforms
 import java.math.BigDecimal
 import kotlinx.coroutines.launch
@@ -88,6 +89,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun EditorScreen(
     modifier: Modifier = Modifier,
+    onOpenSettings: () -> Unit,
     viewModel: EditorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -176,6 +178,7 @@ fun EditorScreen(
             item {
                 BandEditorCard(
                     curve = state.curve,
+                    gainLimit = state.gainLimit,
                     selectedBand = state.selectedBand,
                     listState = bandListState,
                     onBandSelected = viewModel::selectBand,
@@ -212,6 +215,10 @@ fun EditorScreen(
                 viewModel.transform(CurveAction.FLATTEN)
                 showTools = false
             }
+            CurveToolItem("增益上限", if (state.gainLimit.enabled) "${formatShiftDb(state.gainLimit.maximumDb)} dB" else "已关闭") {
+                showTools = false
+                onOpenSettings()
+            }
             Spacer(Modifier.height(28.dp))
         }
     }
@@ -219,6 +226,7 @@ fun EditorScreen(
     if (showShift) {
         ShiftCurveDialog(
             curve = state.curve,
+            gainLimit = state.gainLimit,
             onDismiss = { showShift = false },
             onConfirm = { offset ->
                 viewModel.shift(offset)
@@ -265,10 +273,10 @@ fun EditorScreen(
 }
 
 @Composable
-private fun ShiftCurveDialog(curve: EqCurve, onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
+private fun ShiftCurveDialog(curve: EqCurve, gainLimit: GainLimit, onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
     var input by rememberSaveable(curve) { mutableStateOf("0") }
     val offset = input.replace(',', '.').toDoubleOrNull()?.takeIf(Double::isFinite)
-    val preview = offset?.let { runCatching { EqTransforms.shift(curve, it) } }
+    val preview = offset?.let { runCatching { EqTransforms.shift(curve, it, gainLimit) } }
     val error = if (offset == null) "请输入有效的平移量" else preview?.exceptionOrNull()?.message
     val actualOffset = offset?.let(EqTransforms::quantizedOffsetDb)
     AlertDialog(
@@ -326,8 +334,7 @@ private fun ThresholdLimitDialog(
     val threshold = input.replace(',', '.').toDoubleOrNull()?.takeIf(Double::isFinite)
     val error = when {
         threshold == null -> "请输入有效数值"
-        threshold > com.weich.daptune.core.model.EqCurve.MAX_BOOST_DB ->
-            "不能高于 +${com.weich.daptune.core.model.EqCurve.MAX_BOOST_DB} dB"
+        threshold * EqCurve.Q4_PER_DB > Int.MAX_VALUE.toDouble() -> "超出可表示范围"
         threshold * EqCurve.Q4_PER_DB < Int.MIN_VALUE.toDouble() -> "超出可表示范围"
         else -> null
     }
@@ -461,13 +468,14 @@ private fun CurveOverviewCard(
 @Composable
 private fun BandEditorCard(
     curve: com.weich.daptune.core.model.EqCurve,
+    gainLimit: GainLimit,
     selectedBand: Int,
     listState: LazyListState,
     onBandSelected: (Int) -> Unit,
     onGainChange: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val axis = remember(curve) { gainAxisFor(curve) }
+    val axis = remember(curve, gainLimit) { gainAxisFor(curve, gainLimit.ceilingQ4) }
     AppCard(modifier.fillMaxWidth()) {
         Column {
             Row(

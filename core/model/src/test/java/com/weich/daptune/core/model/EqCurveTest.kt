@@ -8,7 +8,7 @@ class EqCurveTest {
     @Test
     fun decimalConstructionRejectsOverflowInsteadOfSilentlyClipping() {
         assertThrows(IllegalArgumentException::class.java) {
-            EqCurve.ofDb(List(DapBandPlan.bandCount) { 11.0 })
+            EqCurve.ofDb(List(DapBandPlan.bandCount) { 1e12 })
         }
         assertThrows(IllegalArgumentException::class.java) {
             EqCurve.ofDb(List(DapBandPlan.bandCount) { -1e12 })
@@ -25,12 +25,14 @@ class EqCurveTest {
     }
 
     @Test
-    fun boostAboveTenDecibelsIsRejected() {
+    fun boostAboveTenDecibelsIsRepresentableAndPolicyIsSeparate() {
         val gains = IntArray(DapBandPlan.bandCount)
-        gains[0] = EqCurve.MAX_BOOST_Q4 + 1
-
-        assertThrows(IllegalArgumentException::class.java) {
-            EqCurve.ofQ4(gains)
-        }
+        gains[0] = 320
+        val curve = EqCurve.ofQ4(gains)
+        assertEquals(20.0, curve.gainDb(0), 0.0)
+        assertEquals(false, GainLimit().allows(curve))
+        assertEquals(true, GainLimit(enabled = false).allows(curve))
+        assertEquals(true, GainLimit.fromDb(true, 24.0).allows(curve))
+        assertEquals(1, GainLimit.fromDb(true, 0.1).maximumQ4)
     }
 }
